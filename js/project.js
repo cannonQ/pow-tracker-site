@@ -495,15 +495,26 @@ function renderNotesSection(data) {
 function renderSourcesSection(data) {
     const sources = data.data_sources;
     if (!sources) return '';
-    
+
     const allLinks = [
         ...(sources.official_docs || []),
         ...(sources.block_explorer || []),
         ...(sources.market_data || []),
         ...(sources.mining_data || [])
     ];
-    
-    const links = allLinks.map(url => {
+
+    // Filter and validate URLs before processing
+    const validLinks = allLinks.filter(url => {
+        if (typeof url !== 'string' || !url) return false;
+        try {
+            new URL(url);
+            return true;
+        } catch {
+            return false;
+        }
+    });
+
+    const links = validLinks.map(url => {
         const domain = new URL(url).hostname.replace('www.', '');
         return `<a href="${url}" target="_blank" class="source-link">${domain}</a>`;
     }).join('');
