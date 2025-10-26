@@ -88,6 +88,20 @@ function getPreminePercent(project, genesisData) {
     return genesisData.total_genesis_allocation_pct || 0;
 }
 
+// Check if miners have achieved parity with premine
+function hasMinersAchievedParity(project, genesisData) {
+    // Return false if no premine or missing required data
+    if (!project.has_premine || !genesisData) return false;
+    if (!project.emission?.daily_emission || !project.supply?.max_supply || !project.launch_date) return false;
+
+    const dailyEmission = project.emission.daily_emission;
+    const premineTokens = (genesisData.total_genesis_allocation_pct / 100) * project.supply.max_supply;
+    const daysToDate = daysSinceLaunch(project.launch_date);
+    const minedToDate = dailyEmission * daysToDate;
+
+    return minedToDate >= premineTokens;
+}
+
 // Fetch JSON from GitHub using API (avoids CSP sandbox issues with raw.githubusercontent.com)
 async function fetchFromGitHub(path) {
     // Use GitHub API instead of raw URLs to avoid CSP sandbox restrictions

@@ -135,9 +135,13 @@ function createProjectCard(project) {
     // Build premine warning if needed
     let premineWarning = '';
     if (preminePercent > 0) {
+        const hasParity = hasMinersAchievedParity(data, genesis);
+        const warningClass = hasParity ? 'premine-warning-parity' : 'premine-warning';
+        const parityText = hasParity ? ' (✅ miner parity)' : '';
+
         premineWarning = `
-            <div class="premine-warning">
-                ⚠️ ${formatPercent(preminePercent, 1)} allocated at genesis
+            <div class="${warningClass}">
+                ⚠️ ${formatPercent(preminePercent, 1)} premine${parityText}
             </div>
         `;
     }
