@@ -18,6 +18,9 @@
             get RAW_BASE_URL() {
                 return `https://raw.githubusercontent.com/${this.GITHUB_USER}/${this.REPO_NAME}/${this.BRANCH}`;
             },
+            get API_BASE_URL() {
+                return `https://api.github.com/repos/${this.GITHUB_USER}/${this.REPO_NAME}/contents`;
+            },
             PROJECTS_PATH: 'data/projects',
             ALLOCATIONS_PATH: 'allocations'
         };
@@ -32,8 +35,9 @@
                 output.textContent += `  Repo: ${CONFIG.REPO_NAME}\n`;
                 output.textContent += `  RAW_BASE_URL: ${CONFIG.RAW_BASE_URL}\n\n`;
 
-                const projectUrl = `${CONFIG.RAW_BASE_URL}/${CONFIG.PROJECTS_PATH}/ergo.json`;
-                output.textContent += `Fetching: ${projectUrl}\n\n`;
+                // Test with GitHub API (fixes CSP sandbox issue)
+                const projectUrl = `${CONFIG.API_BASE_URL}/${CONFIG.PROJECTS_PATH}/ergo.json`;
+                output.textContent += `Fetching via API: ${projectUrl}\n\n`;
 
                 const response = await fetch(projectUrl);
                 output.textContent += `Response status: ${response.status} ${response.statusText}\n`;
@@ -43,20 +47,25 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                const data = await response.json();
+                const apiData = await response.json();
+                output.textContent += `Decoding base64 content...\n`;
+                const decoded = atob(apiData.content.replace(/\n/g, ''));
+                const data = JSON.parse(decoded);
                 output.textContent += `Success! Project: ${data.project}\n`;
                 output.textContent += `Ticker: ${data.ticker}\n`;
                 output.textContent += `Has premine: ${data.has_premine}\n\n`;
 
                 if (data.has_premine) {
-                    const genesisUrl = `${CONFIG.RAW_BASE_URL}/${CONFIG.ALLOCATIONS_PATH}/ergo/genesis.json`;
-                    output.textContent += `Fetching genesis: ${genesisUrl}\n\n`;
+                    const genesisUrl = `${CONFIG.API_BASE_URL}/${CONFIG.ALLOCATIONS_PATH}/ergo/genesis.json`;
+                    output.textContent += `Fetching genesis via API: ${genesisUrl}\n\n`;
 
                     const genesisResponse = await fetch(genesisUrl);
                     output.textContent += `Genesis response status: ${genesisResponse.status}\n`;
 
                     if (genesisResponse.ok) {
-                        const genesisData = await genesisResponse.json();
+                        const genesisApiData = await genesisResponse.json();
+                        const decodedGenesis = atob(genesisApiData.content.replace(/\n/g, ''));
+                        const genesisData = JSON.parse(decodedGenesis);
                         output.textContent += `Genesis data loaded! Allocation: ${genesisData.total_genesis_allocation_pct}%\n`;
                     }
                 }

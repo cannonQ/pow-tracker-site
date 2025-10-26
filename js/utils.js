@@ -75,15 +75,26 @@ function getPreminePercent(project, genesisData) {
     return genesisData.total_genesis_allocation_pct || 0;
 }
 
-// Fetch JSON from GitHub
+// Fetch JSON from GitHub using API (avoids CSP sandbox issues with raw.githubusercontent.com)
 async function fetchFromGitHub(path) {
-    const url = `${CONFIG.RAW_BASE_URL}/${path}`;
+    // Use GitHub API instead of raw URLs to avoid CSP sandbox restrictions
+    const apiUrl = `${CONFIG.API_BASE_URL}/${path}`;
+
     try {
-        const response = await fetch(url);
+        const response = await fetch(apiUrl);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        return await response.json();
+
+        const data = await response.json();
+
+        // GitHub API returns base64 encoded content
+        if (data.content) {
+            const decoded = atob(data.content.replace(/\n/g, ''));
+            return JSON.parse(decoded);
+        }
+
+        throw new Error('No content in response');
     } catch (error) {
         console.error(`Error fetching ${path}:`, error);
         return null;
