@@ -39,7 +39,7 @@ async function loadProjectData(projectName) {
 
 function renderProjectPage() {
     const container = document.getElementById('project-content');
-    const badge = getFairnessBadge(projectData);
+    const badge = getFairnessBadge(projectData, genesisData);
     const preminePercent = getPreminePercent(projectData, genesisData);
     
     let html = `
@@ -75,14 +75,17 @@ function renderProjectPage() {
 
 function renderWarningBanner(data, preminePercent) {
     if (preminePercent > 0) {
+        const hasParity = hasMinersAchievedParity(data, genesisData);
+        const bannerClass = hasParity ? 'warning-banner parity' : 'warning-banner';
+
         return `
-            <div class="warning-banner">
+            <div class="${bannerClass}">
                 ⚠️ <strong>WARNING:</strong> ${formatPercent(preminePercent, 1)} premine allocation
                 ${genesisData ? calculateParityWarning(data, genesisData) : ''}
             </div>
         `;
     }
-    
+
     if (data.launch_type === 'fair_with_suspicion') {
         return `
             <div class="warning-banner suspicious">
@@ -90,7 +93,7 @@ function renderWarningBanner(data, preminePercent) {
             </div>
         `;
     }
-    
+
     return '';
 }
 
