@@ -3,9 +3,22 @@
 // Format large numbers (e.g., 1500000000 -> 1.5B)
 function formatNumber(num, decimals = 2) {
     if (num === null || num === undefined) return 'N/A';
-    
+
+    // If it's a string, check if it contains non-numeric characters like "~1200000"
+    if (typeof num === 'string') {
+        // If it starts with ~ or contains other non-numeric chars (except - and .), return as-is
+        if (num.includes('~') || isNaN(parseFloat(num.replace(/[~,]/g, '')))) {
+            return num;
+        }
+        // Try to convert to number
+        num = parseFloat(num.replace(/[~,]/g, ''));
+    }
+
+    // Ensure we have a valid number
+    if (isNaN(num)) return 'N/A';
+
     const absNum = Math.abs(num);
-    
+
     if (absNum >= 1e12) {
         return (num / 1e12).toFixed(decimals) + 'T';
     } else if (absNum >= 1e9) {
@@ -15,7 +28,7 @@ function formatNumber(num, decimals = 2) {
     } else if (absNum >= 1e3) {
         return (num / 1e3).toFixed(decimals) + 'K';
     }
-    
+
     return num.toFixed(decimals);
 }
 
