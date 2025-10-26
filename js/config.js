@@ -2,7 +2,7 @@
 const CONFIG = {
     // Replace with your GitHub username and repo name
     GITHUB_USER: 'cannonQ',
-    REPO_NAME: 'pow-tokenomics-tracker/pow-tokenomics-tracker',
+    REPO_NAME: 'pow-tokenomics-tracker',
     BRANCH: 'main',
     
     // Constructed URLs
@@ -39,4 +39,5 @@ Current config:
 - Repo: ${CONFIG.REPO_NAME}
 - Branch: ${CONFIG.BRANCH}
 `);
+
 
