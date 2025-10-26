@@ -329,6 +329,16 @@ a:hover {
     color: var(--danger);
 }
 
+.premine-warning-parity {
+    background: rgba(243, 156, 18, 0.1);
+    border: 1px solid var(--warning);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-top: 1rem;
+    font-size: 0.85rem;
+    color: var(--warning);
+}
+
 .project-meta {
     display: flex;
     justify-content: space-between;
