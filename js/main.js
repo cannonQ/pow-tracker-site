@@ -184,7 +184,7 @@ function createProjectCard(project) {
                     <span>${formatCurrency(fdmc)}</span>
                 </div>
                 <div class="stat-row">
-                    <span>% Mined</span>
+                    <span>% of Max Supply</span>
                     <span class="text-primary font-bold">${formatPercent(pctMined, 1)}</span>
                 </div>
             </div>
