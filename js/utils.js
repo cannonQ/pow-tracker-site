@@ -65,20 +65,24 @@ function daysSinceLaunch(launchDate) {
 }
 
 // Determine fairness badge
-function getFairnessBadge(project) {
+function getFairnessBadge(project, genesisData = null) {
     if (project.has_premine) {
+        // Check if miners have achieved parity
+        if (hasMinersAchievedParity(project, genesisData)) {
+            return { class: 'badge-premine-parity', text: 'Premine' };
+        }
         return { class: 'badge-premine', text: 'Premine' };
     }
-    
+
     // Check for suspected insider mining
     if (project.launch_type === 'fair_with_suspicion') {
         return { class: 'badge-suspicious', text: 'Suspicious' };
     }
-    
+
     if (project.launch_type === 'fair') {
         return { class: 'badge-fair', text: 'Fair Launch' };
     }
-    
+
     return { class: 'badge-premine', text: project.launch_type };
 }
 

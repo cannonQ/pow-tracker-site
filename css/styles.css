@@ -279,6 +279,12 @@ a:hover {
     border: 1px solid var(--warning);
 }
 
+.badge-premine-parity {
+    background: rgba(243, 156, 18, 0.2);
+    color: var(--warning);
+    border: 1px solid var(--warning);
+}
+
 .project-stats {
     margin: 1rem 0;
 }

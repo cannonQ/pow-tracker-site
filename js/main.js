@@ -122,7 +122,7 @@ function renderProjects() {
 function createProjectCard(project) {
     const data = project.data;
     const genesis = project.genesis;
-    const badge = getFairnessBadge(data);
+    const badge = getFairnessBadge(data, genesis);
     const preminePercent = getPreminePercent(data, genesis);
     
     // Mining progress
