@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PoW Tokenomics Tracker - Transparency in Mining</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>⛏️ PoW Tokenomics</h1>
+                <p class="tagline">Show the data, let users judge</p>
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="active">Projects</a>
+                <a href="pages/compare.html">Compare</a>
+                <a href="https://github.com/cannonQ/pow-tokenomics-tracker" target="_blank">GitHub</a>
+                <a href="pages/about.html">About</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="hero">
+        <div class="container">
+            <h2>Transparent PoW Tokenomics</h2>
+            <p>Community-driven data on mining fairness, premine allocations, and insider advantages</p>
+            <div class="hero-stats">
+                <div class="stat">
+                    <div class="stat-value" id="total-projects">-</div>
+                    <div class="stat-label">Projects Tracked</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="fair-launches">-</div>
+                    <div class="stat-label">Fair Launches</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="premined">-</div>
+                    <div class="stat-label">Premined</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="filters">
+            <div class="filter-group">
+                <label>Filter:</label>
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="fair">Fair Launch</button>
+                <button class="filter-btn" data-filter="premine">Premine</button>
+                <button class="filter-btn" data-filter="suspicious">Suspicious</button>
+            </div>
+            <div class="filter-group">
+                <label>Sort:</label>
+                <select id="sort-select">
+                    <option value="name">Name (A-Z)</option>
+                    <option value="fdmc">Market Cap (High to Low)</option>
+                    <option value="launch">Launch Date (Newest)</option>
+                    <option value="premine">Premine % (High to Low)</option>
+                    <option value="mined">% Mined (High to Low)</option>
+                </select>
+            </div>
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Search projects...">
+            </div>
+        </div>
+
+        <div class="projects-grid" id="projects-grid">
+            <!-- Projects will be loaded here via JavaScript -->
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading projects from GitHub...</p>
+            </div>
+        </div>
+
+        <div class="empty-state" id="empty-state" style="display: none;">
+            <h3>No projects found</h3>
+            <p>Try adjusting your filters or search terms</p>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>Data sourced from community contributions • <a href="https://github.com/cannonQ/pow-tokenomics-tracker" target="_blank">Contribute on GitHub</a></p>
+            <p class="disclaimer">This is a community project. Always verify data independently. Not financial advice.</p>
+        </div>
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

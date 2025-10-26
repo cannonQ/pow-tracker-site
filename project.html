@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Details - PoW Tokenomics Tracker</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <h1>⛏️ PoW Tokenomics Tracker</h1>
+                <p class="tagline">Show the data. Let users judge fairness.</p>
+            </div>
+            <nav>
+                <a href="index.html">All Projects</a>
+                <a href="compare.html">Compare</a>
+                <a href="about.html">About</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Back Button -->
+        <div class="back-nav">
+            <a href="index.html" class="back-link">← Back to All Projects</a>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="loading">
+            <div class="spinner"></div>
+            <p>Loading project data...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="error-state" style="display: none;">
+            <p>❌ Failed to load project data.</p>
+            <button onclick="history.back()">Go Back</button>
+        </div>
+
+        <!-- Project Content -->
+        <div id="projectContent" style="display: none;">
+            <!-- Project Header -->
+            <section class="project-header">
+                <div class="project-title-row">
+                    <div>
+                        <h2 id="projectName">Loading...</h2>
+                        <div class="project-meta">
+                            <span id="projectTicker" class="ticker">---</span>
+                            <span class="separator">•</span>
+                            <span id="projectAlgorithm">---</span>
+                            <span class="separator">•</span>
+                            <span id="projectLaunchDate">---</span>
+                        </div>
+                    </div>
+                    <div class="launch-badge" id="launchBadge">
+                        <!-- Badge inserted by JS -->
+                    </div>
+                </div>
+                
+                <!-- Warning Banner (if premine) -->
+                <div id="warningBanner" class="warning-banner" style="display: none;">
+                    <strong>⚠️ WARNING:</strong> <span id="warningText"></span>
+                </div>
+            </section>
+
+            <!-- Key Metrics Grid -->
+            <section class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Current Price</div>
+                    <div class="metric-value" id="currentPrice">$---</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">FDMC</div>
+                    <div class="metric-value" id="fdmc">$---</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">% Mined</div>
+                    <div class="metric-value" id="pctMined">--%</div>
+                    <div class="metric-progress">
+                        <div class="progress-bar" id="minedProgress"></div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Annual Inflation</div>
+                    <div class="metric-value" id="inflation">--%</div>
+                </div>
+            </section>
+
+            <!-- Supply & Emission -->
+            <section class="data-section">
+                <h3>📊 Supply & Emission</h3>
+                <div class="data-grid">
+                    <div class="data-item">
+                        <span class="data-label">Max Supply:</span>
+                        <span class="data-value" id="maxSupply">---</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Current Supply:</span>
+                        <span class="data-value" id="currentSupply">---</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Daily Emission:</span>
+                        <span class="data-value" id="dailyEmission">---</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Block Reward:</span>
+                        <span class="data-value" id="blockReward">---</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Block Time:</span>
+                        <span class="data-value" id="blockTime">---</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Genesis Allocation (if premine) -->
+            <section id="genesisSection" class="data-section" style="display: none;">
+                <h3>🎯 Genesis Allocation</h3>
+                <div class="allocation-chart" id="allocationChart">
+                    <!-- Chart will be inserted by JS -->
+                </div>
+                <div class="allocation-table" id="allocationTable">
+                    <!-- Table will be inserted by JS -->
+                </div>
+            </section>
+
+            <!-- Miner Parity Timeline (if premine) -->
+            <section id="paritySection" class="data-section" style="display: none;">
+                <h3>⏱️ Miner Parity Timeline</h3>
+                <p class="section-description">When will miners have mined as much as each premine tier?</p>
+                <div class="parity-table" id="parityTable">
+                    <!-- Table will be inserted by JS -->
+                </div>
+            </section>
+
+            <!-- Mining Economics -->
+            <section class="data-section">
+                <h3>⛏️ Mining Economics</h3>
+                <div class="data-grid">
+                    <div class="data-item">
+                        <span class="data-label">Hashrate:</span>
+                        <span class="data-value" id="hashrate">---</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Difficulty:</span>
+                        <span class="data-value" id="difficulty">---</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Cost to Mine:</span>
+                        <span class="data-value" id="costToMine">---</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Hardware:</span>
+                        <span class="data-value" id="hardware">---</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Decentralization -->
+            <section class="data-section">
+                <h3>🌐 Decentralization</h3>
+                <div class="data-grid">
+                    <div class="data-item">
+                        <span class="data-label">Active Pools:</span>
+                        <span class="data-value" id="activePools">---</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Top 5 Pools:</span>
+                        <span class="data-value" id="top5Pools">---</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Largest Pool:</span>
+                        <span class="data-value" id="largestPool">---</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Nakamoto Coefficient:</span>
+                        <span class="data-value" id="nakamoto">---</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Notes -->
+            <section id="notesSection" class="data-section" style="display: none;">
+                <h3>📝 Notes</h3>
+                <ul id="notesList" class="notes-list">
+                    <!-- Notes will be inserted by JS -->
+                </ul>
+            </section>
+
+            <!-- Data Sources -->
+            <section class="data-section">
+                <h3>🔗 Data Sources</h3>
+                <div id="sourcesContainer" class="sources-container">
+                    <!-- Sources will be inserted by JS -->
+                </div>
+                <p class="last-updated">
+                    Last updated: <span id="lastUpdated">---</span>
+                </p>
+            </section>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>
+                Community-driven transparency for PoW tokenomics. 
+                <a href="https://github.com/YOUR-USERNAME/pow-tokenomics-tracker" target="_blank">Contribute on GitHub</a>
+            </p>
+        </div>
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/project.js"></script>
+</body>
+</html>
