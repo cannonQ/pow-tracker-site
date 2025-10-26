@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Fetch Test</title>
+</head>
+<body>
+    <h1>Data Fetch Test</h1>
+    <div id="status">Testing...</div>
+    <pre id="output"></pre>
+
+    <script>
+        const CONFIG = {
+            GITHUB_USER: 'cannonQ',
+            REPO_NAME: 'pow-tokenomics-tracker',
+            BRANCH: 'main',
+            get RAW_BASE_URL() {
+                return `https://raw.githubusercontent.com/${this.GITHUB_USER}/${this.REPO_NAME}/${this.BRANCH}`;
+            },
+            PROJECTS_PATH: 'data/projects',
+            ALLOCATIONS_PATH: 'allocations'
+        };
+
+        async function testFetch() {
+            const output = document.getElementById('output');
+            const status = document.getElementById('status');
+
+            try {
+                output.textContent += `Testing CONFIG:\n`;
+                output.textContent += `  User: ${CONFIG.GITHUB_USER}\n`;
+                output.textContent += `  Repo: ${CONFIG.REPO_NAME}\n`;
+                output.textContent += `  RAW_BASE_URL: ${CONFIG.RAW_BASE_URL}\n\n`;
+
+                const projectUrl = `${CONFIG.RAW_BASE_URL}/${CONFIG.PROJECTS_PATH}/ergo.json`;
+                output.textContent += `Fetching: ${projectUrl}\n\n`;
+
+                const response = await fetch(projectUrl);
+                output.textContent += `Response status: ${response.status} ${response.statusText}\n`;
+                output.textContent += `Response ok: ${response.ok}\n\n`;
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                output.textContent += `Success! Project: ${data.project}\n`;
+                output.textContent += `Ticker: ${data.ticker}\n`;
+                output.textContent += `Has premine: ${data.has_premine}\n\n`;
+
+                if (data.has_premine) {
+                    const genesisUrl = `${CONFIG.RAW_BASE_URL}/${CONFIG.ALLOCATIONS_PATH}/ergo/genesis.json`;
+                    output.textContent += `Fetching genesis: ${genesisUrl}\n\n`;
+
+                    const genesisResponse = await fetch(genesisUrl);
+                    output.textContent += `Genesis response status: ${genesisResponse.status}\n`;
+
+                    if (genesisResponse.ok) {
+                        const genesisData = await genesisResponse.json();
+                        output.textContent += `Genesis data loaded! Allocation: ${genesisData.total_genesis_allocation_pct}%\n`;
+                    }
+                }
+
+                status.textContent = '✅ All tests passed!';
+                status.style.color = 'green';
+
+            } catch (error) {
+                output.textContent += `\n❌ ERROR: ${error.message}\n`;
+                output.textContent += `Stack: ${error.stack}\n`;
+                status.textContent = '❌ Test failed - see details above';
+                status.style.color = 'red';
+            }
+        }
+
+        testFetch();
+    </script>
+</body>
+</html>
