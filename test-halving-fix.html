@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Kaspa Halving Fix</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        #output {
+            white-space: pre-wrap;
+            background: #000;
+            padding: 15px;
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .info { color: #00aaff; }
+    </style>
+</head>
+<body>
+    <h1>Testing Kaspa Halving Data Normalization</h1>
+    <button onclick="runTest()">Run Test</button>
+    <div id="output">Click "Run Test" to start...</div>
+
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            output.innerHTML += `<span class="${className}">${message}</span>\n`;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+        }
+
+        async function runTest() {
+            clearOutput();
+            log('='.repeat(60), 'info');
+            log('Testing Kaspa Halving Data Normalization', 'info');
+            log('='.repeat(60), 'info');
+
+            try {
+                // Fetch Kaspa data
+                log('\n1. Fetching Kaspa data from repository...', 'info');
+                const kaspaData = await fetchFromGitHub(`${CONFIG.PROJECTS_PATH}/kaspa.json`);
+
+                if (!kaspaData) {
+                    log('✗ Failed to fetch Kaspa data', 'error');
+                    return;
+                }
+                log('✓ Kaspa data fetched successfully', 'success');
+
+                // Show original halving schedule
+                log('\n2. Original halving schedule:', 'info');
+                log(JSON.stringify(kaspaData.emission.halving_schedule, null, 2), 'info');
+
+                // Normalize the data
+                log('\n3. Normalizing data...', 'info');
+                const normalizedData = normalizeProjectData(kaspaData);
+
+                // Show normalized halving schedule
+                log('\n4. Normalized halving schedule:', 'info');
+                log(JSON.stringify(normalizedData.emission.halving_schedule, null, 2), 'success');
+
+                // Verify the fix
+                log('\n5. Verification:', 'info');
+                const schedule = normalizedData.emission.halving_schedule;
+
+                let allValid = true;
+                schedule.forEach((event, index) => {
+                    const hasRewardBefore = event.reward_before !== undefined;
+                    const hasRewardAfter = event.reward_after !== undefined;
+                    const hasHeight = event.height !== undefined;
+                    const hasDate = event.date !== undefined;
+
+                    const isValid = hasRewardBefore && hasRewardAfter && hasHeight && hasDate;
+
+                    log(`\nEvent ${index + 1}:`, isValid ? 'success' : 'error');
+                    log(`  Date: ${event.date} ${hasDate ? '✓' : '✗'}`, hasDate ? 'success' : 'error');
+                    log(`  Reward Before: ${event.reward_before} ${hasRewardBefore ? '✓' : '✗'}`, hasRewardBefore ? 'success' : 'error');
+                    log(`  Reward After: ${event.reward_after} ${hasRewardAfter ? '✓' : '✗'}`, hasRewardAfter ? 'success' : 'error');
+                    log(`  Height: ${event.height} ${hasHeight ? '✓' : '✗'}`, hasHeight ? 'success' : 'error');
+                    log(`  Event #: ${event.event}`, 'info');
+
+                    if (!isValid) allValid = false;
+                });
+
+                log('\n' + '='.repeat(60), 'info');
+                if (allValid) {
+                    log('✓ ALL TESTS PASSED! Halving data is now normalized.', 'success');
+                    log('✓ No more "undefined" or "N/A" values should appear.', 'success');
+                } else {
+                    log('✗ Some tests failed. Check the output above.', 'error');
+                }
+                log('='.repeat(60), 'info');
+
+            } catch (error) {
+                log(`\n✗ ERROR: ${error.message}`, 'error');
+                log(`Stack: ${error.stack}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
