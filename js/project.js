@@ -116,7 +116,35 @@ function calculateParityWarning(data, genesis) {
     return ` | Miner parity in ${yearsRemaining} years`;
 }
 
+function calculateMinedPercent(projectData, genesisData) {
+    if (!projectData.supply?.current_supply || !projectData.supply?.max_supply) {
+        return null;
+    }
+
+    const currentSupply = projectData.supply.current_supply;
+    const maxSupply = projectData.supply.max_supply;
+    const currentSupplyPct = (currentSupply / maxSupply) * 100;
+
+    // For fair launches, % mined equals current supply %
+    if (!projectData.has_premine || !genesisData) {
+        return currentSupplyPct;
+    }
+
+    // Calculate % mined excluding premine
+    const preminePct = genesisData.total_genesis_allocation_pct || 0;
+    const minedPct = currentSupplyPct - preminePct;
+
+    // Cap at 0% if premine exceeds current supply (early stage projects)
+    return Math.max(0, minedPct);
+}
+
 function renderKeyMetrics(data) {
+    const supply = data.supply;
+    const currentSupplyPct = supply && supply.current_supply && supply.max_supply
+        ? (supply.current_supply / supply.max_supply) * 100
+        : null;
+    const minedPct = calculateMinedPercent(data, genesisData);
+
     return `
         <div class="metric-box">
             <div class="metric-label">Current Price</div>
@@ -127,8 +155,12 @@ function renderKeyMetrics(data) {
             <div class="metric-value">${formatCurrency(data.market_data?.fdmc)}</div>
         </div>
         <div class="metric-box">
+            <div class="metric-label">Current Supply %</div>
+            <div class="metric-value">${formatPercent(currentSupplyPct, 1)}</div>
+        </div>
+        <div class="metric-box">
             <div class="metric-label">% Mined</div>
-            <div class="metric-value highlight">${formatPercent(data.supply?.pct_mined, 1)}</div>
+            <div class="metric-value highlight">${formatPercent(minedPct, 1)}</div>
         </div>
         <div class="metric-box">
             <div class="metric-label">Daily Emission</div>
@@ -248,8 +280,88 @@ function renderDecentralizationPath(data, genesis) {
     `;
 }
 
+function renderCurrentSupplyPieChart(projectData, genesisData) {
+    const supply = projectData.supply;
+    const maxSupply = supply.max_supply;
+    const currentSupply = supply.current_supply;
+
+    // Calculate current supply percentage
+    const currentSupplyPct = (currentSupply / maxSupply) * 100;
+
+    let slices = [];
+
+    if (!projectData.has_premine || !genesisData) {
+        // Fair launch: 100% mined
+        slices = [
+            { label: 'Mined (Block Rewards)', percent: currentSupplyPct, class: 'mining', tokens: currentSupply }
+        ];
+    } else {
+        // Premine: Calculate breakdown
+        const tiers = genesisData.allocation_tiers;
+        const tier1Pct = tiers.tier_1_profit_seeking?.total_pct || 0;
+        const tier2Pct = tiers.tier_2_entity_controlled?.total_pct || 0;
+        const tier3Pct = tiers.tier_3_community?.total_pct || 0;
+        const tier4Pct = tiers.tier_4_liquidity?.total_pct || 0;
+        const premineTotalPct = genesisData.total_genesis_allocation_pct || 0;
+        const minedPct = Math.max(0, currentSupplyPct - premineTotalPct);
+
+        // Calculate absolute token amounts
+        const minedTokens = (minedPct / 100) * maxSupply;
+        const tier1Tokens = (tier1Pct / 100) * maxSupply;
+        const tier2Tokens = (tier2Pct / 100) * maxSupply;
+        const tier3Tokens = (tier3Pct / 100) * maxSupply;
+        const tier4Tokens = (tier4Pct / 100) * maxSupply;
+
+        slices = [
+            { label: 'Mined (Block Rewards)', percent: minedPct, class: 'mining', tokens: minedTokens },
+            tier1Pct > 0 ? { label: 'Tier 1: Profit-Seeking', percent: tier1Pct, class: 'tier-1', tokens: tier1Tokens } : null,
+            tier2Pct > 0 ? { label: 'Tier 2: Entity Controlled', percent: tier2Pct, class: 'tier-2', tokens: tier2Tokens } : null,
+            tier3Pct > 0 ? { label: 'Tier 3: Community', percent: tier3Pct, class: 'tier-3', tokens: tier3Tokens } : null,
+            tier4Pct > 0 ? { label: 'Tier 4: Liquidity', percent: tier4Pct, class: 'tier-4', tokens: tier4Tokens } : null,
+        ].filter(Boolean);
+    }
+
+    // Generate conic-gradient CSS
+    let gradientStops = [];
+    let cumulative = 0;
+
+    slices.forEach(slice => {
+        const startDeg = (cumulative / 100) * 360;
+        const endDeg = ((cumulative + slice.percent) / 100) * 360;
+        gradientStops.push(`var(--${slice.class}-color) ${startDeg}deg ${endDeg}deg`);
+        cumulative += slice.percent;
+    });
+
+    const conicGradient = `conic-gradient(${gradientStops.join(', ')})`;
+
+    return `
+        <div class="supply-pie-chart-container">
+            <h3 style="margin: 1.5rem 0 1rem 0; color: var(--text);">Current Supply Breakdown</h3>
+            <div class="pie-chart-wrapper">
+                <div class="pie-chart" style="background: ${conicGradient}"></div>
+                <div class="pie-chart-legend">
+                    ${slices.map(slice => `
+                        <div class="pie-legend-item">
+                            <div class="pie-legend-color ${slice.class}"></div>
+                            <span class="pie-legend-label">${slice.label}</span>
+                            <span class="pie-legend-value">${formatPercent(slice.percent, 1)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                Current supply distribution showing ${projectData.has_premine ? 'premine allocations vs miner rewards' : 'mined tokens'} out of ${formatNumber(currentSupply, 0)} ${projectData.ticker} total.
+            </p>
+        </div>
+    `;
+}
+
 function renderSupplySection(data) {
     const supply = data.supply;
+    const currentSupplyPct = supply && supply.current_supply && supply.max_supply
+        ? (supply.current_supply / supply.max_supply) * 100
+        : null;
+    const minedPct = calculateMinedPercent(data, genesisData);
 
     return `
         <div class="section">
@@ -266,15 +378,32 @@ function renderSupplySection(data) {
                     <span class="data-value">${formatNumber(supply.current_supply, 0)}</span>
                 </div>
                 <div class="data-item">
-                    <span class="data-label">% Mined</span>
-                    <span class="data-value text-primary">${formatPercent(supply.pct_mined, 2)}</span>
-                </div>
-                <div class="data-item">
                     <span class="data-label">Remaining Emission</span>
                     <span class="data-value">${formatNumber(supply.emission_remaining, 0)}</span>
                 </div>
             </div>
 
+            <div class="supply-percentage-section">
+                <h3 style="margin: 1.5rem 0 1rem 0; color: var(--text);">Supply Progress</h3>
+                <div class="data-grid">
+                    <div class="data-item-detailed">
+                        <div class="data-item-header">
+                            <span class="data-label">Current Supply %</span>
+                            <span class="data-value">${formatPercent(currentSupplyPct, 2)}</span>
+                        </div>
+                        <div class="data-description">Total circulating supply as % of max supply</div>
+                    </div>
+                    <div class="data-item-detailed">
+                        <div class="data-item-header">
+                            <span class="data-label">% Mined</span>
+                            <span class="data-value text-primary">${formatPercent(minedPct, 2)}</span>
+                        </div>
+                        <div class="data-description">Miner block rewards only (excludes ${data.has_premine ? 'premine' : 'any allocations'})</div>
+                    </div>
+                </div>
+            </div>
+
+            ${projectData.has_premine && genesisData ? renderCurrentSupplyPieChart(projectData, genesisData) : ''}
             ${projectData.has_premine && genesisData ? renderSupplyAllocation(projectData, genesisData) : ''}
             ${projectData.has_premine && genesisData ? renderDecentralizationPath(projectData, genesisData) : ''}
         </div>
@@ -507,56 +636,34 @@ function renderGenesisSection(genesis) {
     `;
 }
 
+function renderTierRow(label, percent, className) {
+    return `
+        <div class="tier-row">
+            <div class="tier-label">${label}</div>
+            <div class="tier-bar-container">
+                <div class="tier-bar ${className}" style="width: ${percent}%"></div>
+                <span class="tier-percent">${formatPercent(percent, 1)}</span>
+            </div>
+        </div>
+    `;
+}
+
 function renderAllocationChart(genesis) {
     const tiers = genesis.allocation_tiers;
     const mining = genesis.available_for_mining_genesis_pct;
-    
+
     const tier1 = tiers.tier_1_profit_seeking?.total_pct || 0;
     const tier2 = tiers.tier_2_entity_controlled?.total_pct || 0;
     const tier3 = tiers.tier_3_community?.total_pct || 0;
     const tier4 = tiers.tier_4_liquidity?.total_pct || 0;
-    
+
     return `
-        <div class="allocation-chart">
-            <div class="allocation-bar">
-                ${tier1 > 0 ? `<div class="allocation-segment tier-1" style="width: ${tier1}%">${tier1 > 5 ? formatPercent(tier1, 1) : ''}</div>` : ''}
-                ${tier2 > 0 ? `<div class="allocation-segment tier-2" style="width: ${tier2}%">${tier2 > 5 ? formatPercent(tier2, 1) : ''}</div>` : ''}
-                ${tier3 > 0 ? `<div class="allocation-segment tier-3" style="width: ${tier3}%">${tier3 > 5 ? formatPercent(tier3, 1) : ''}</div>` : ''}
-                ${tier4 > 0 ? `<div class="allocation-segment tier-4" style="width: ${tier4}%">${tier4 > 5 ? formatPercent(tier4, 1) : ''}</div>` : ''}
-                ${mining > 0 ? `<div class="allocation-segment mining" style="width: ${mining}%">${mining > 5 ? formatPercent(mining, 1) : ''}</div>` : ''}
-            </div>
-            
-            <div class="allocation-legend">
-                ${tier1 > 0 ? `
-                <div class="legend-item">
-                    <div class="legend-color tier-1"></div>
-                    <span class="legend-text">Profit-Seeking (VCs/Team)</span>
-                    <span class="legend-percent">${formatPercent(tier1, 1)}</span>
-                </div>` : ''}
-                ${tier2 > 0 ? `
-                <div class="legend-item">
-                    <div class="legend-color tier-2"></div>
-                    <span class="legend-text">Entity Controlled (Foundation)</span>
-                    <span class="legend-percent">${formatPercent(tier2, 1)}</span>
-                </div>` : ''}
-                ${tier3 > 0 ? `
-                <div class="legend-item">
-                    <div class="legend-color tier-3"></div>
-                    <span class="legend-text">Community</span>
-                    <span class="legend-percent">${formatPercent(tier3, 1)}</span>
-                </div>` : ''}
-                ${tier4 > 0 ? `
-                <div class="legend-item">
-                    <div class="legend-color tier-4"></div>
-                    <span class="legend-text">Liquidity</span>
-                    <span class="legend-percent">${formatPercent(tier4, 1)}</span>
-                </div>` : ''}
-                <div class="legend-item">
-                    <div class="legend-color mining"></div>
-                    <span class="legend-text">Available for Mining</span>
-                    <span class="legend-percent">${formatPercent(mining, 1)}</span>
-                </div>
-            </div>
+        <div class="allocation-chart-stacked">
+            ${tier1 > 0 ? renderTierRow('Tier 1: Profit-Seeking (VCs/Team)', tier1, 'tier-1') : ''}
+            ${tier2 > 0 ? renderTierRow('Tier 2: Entity Controlled (Foundation)', tier2, 'tier-2') : ''}
+            ${tier3 > 0 ? renderTierRow('Tier 3: Community', tier3, 'tier-3') : ''}
+            ${tier4 > 0 ? renderTierRow('Tier 4: Liquidity', tier4, 'tier-4') : ''}
+            ${renderTierRow('Available for Mining', mining, 'mining')}
         </div>
     `;
 }
