@@ -451,7 +451,19 @@ function renderVestingWaterfall(waterfall) {
 
 function renderMarketSection(data) {
     const market = data.market_data;
-    
+
+    // Check if market data exists
+    if (!market) {
+        return `
+            <div class="section">
+                <div class="section-header">
+                    <h2 class="section-title">💰 Market Data</h2>
+                </div>
+                <p style="color: var(--text-secondary); padding: 1rem;">Market data not available</p>
+            </div>
+        `;
+    }
+
     return `
         <div class="section">
             <div class="section-header">
@@ -460,7 +472,7 @@ function renderMarketSection(data) {
             <div class="data-grid">
                 <div class="data-item">
                     <span class="data-label">Current Price</span>
-                    <span class="data-value">${formatCurrency(market.current_price_usd)}</span>
+                    <span class="data-value">${formatCurrency(market.current_price_usd, 4)}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">FDMC</span>
