@@ -178,6 +178,40 @@ function normalizeProjectData(projectData) {
         delete projectData.mining.last_updated;
     }
 
+    // Normalize halving schedule for Kaspa and similar projects
+    if (projectData.emission?.halving_schedule && Array.isArray(projectData.emission.halving_schedule)) {
+        const blockTime = projectData.emission.block_time_seconds || 1;
+
+        projectData.emission.halving_schedule = projectData.emission.halving_schedule.map((event, index) => {
+            const normalized = { ...event };
+
+            // Convert per-second rewards to per-block rewards if needed
+            if (event.reward_before_per_second !== undefined && !event.reward_before) {
+                normalized.reward_before = (event.reward_before_per_second * blockTime).toFixed(2);
+            }
+            if (event.reward_after_per_second !== undefined && !event.reward_after) {
+                normalized.reward_after = (event.reward_after_per_second * blockTime).toFixed(2);
+            }
+
+            // Estimate block height if missing (Kaspa specific calculation)
+            if (!event.height && event.date && projectData.launch_date) {
+                const launchDate = new Date(projectData.launch_date);
+                const eventDate = new Date(event.date);
+                const daysSinceLaunch = (eventDate - launchDate) / (1000 * 60 * 60 * 24);
+                const blocksPerDay = (60 * 60 * 24) / blockTime;
+                normalized.height = Math.round(daysSinceLaunch * blocksPerDay);
+            }
+
+            // Extract halving number from event description if event is text
+            if (typeof event.event === 'string' && event.event.match(/Year (\d+)/)) {
+                const yearMatch = event.event.match(/Year (\d+)/);
+                normalized.event = yearMatch ? yearMatch[1] : (index + 1);
+            }
+
+            return normalized;
+        });
+    }
+
     return projectData;
 }
 
