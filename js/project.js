@@ -137,9 +137,120 @@ function renderKeyMetrics(data) {
     `;
 }
 
+function renderSupplyAllocation(data, genesis) {
+    if (!genesis || !genesis.allocation_tiers) return '';
+
+    const tiers = genesis.allocation_tiers;
+    const mining = genesis.available_for_mining_genesis_pct;
+
+    const tier1 = tiers.tier_1_profit_seeking?.total_pct || 0;
+    const tier2 = tiers.tier_2_entity_controlled?.total_pct || 0;
+    const tier3 = tiers.tier_3_community?.total_pct || 0;
+    const tier4 = tiers.tier_4_liquidity?.total_pct || 0;
+
+    // Calculate absolute tokens
+    const maxSupply = data.supply.max_supply;
+    const tier1Tokens = (tier1 / 100) * maxSupply;
+    const tier2Tokens = (tier2 / 100) * maxSupply;
+    const tier3Tokens = (tier3 / 100) * maxSupply;
+    const tier4Tokens = (tier4 / 100) * maxSupply;
+    const miningTokens = (mining / 100) * maxSupply;
+
+    return `
+        <div style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 1rem; color: var(--text);">Allocation Breakdown</h3>
+            <div class="allocation-chart">
+                <div class="allocation-bar">
+                    ${tier1 > 0 ? `<div class="allocation-segment tier-1" style="width: ${tier1}%">${tier1 > 5 ? formatPercent(tier1, 1) : ''}</div>` : ''}
+                    ${tier2 > 0 ? `<div class="allocation-segment tier-2" style="width: ${tier2}%">${tier2 > 5 ? formatPercent(tier2, 1) : ''}</div>` : ''}
+                    ${tier3 > 0 ? `<div class="allocation-segment tier-3" style="width: ${tier3}%">${tier3 > 5 ? formatPercent(tier3, 1) : ''}</div>` : ''}
+                    ${tier4 > 0 ? `<div class="allocation-segment tier-4" style="width: ${tier4}%">${tier4 > 5 ? formatPercent(tier4, 1) : ''}</div>` : ''}
+                    ${mining > 0 ? `<div class="allocation-segment mining" style="width: ${mining}%">${mining > 5 ? formatPercent(mining, 1) : ''}</div>` : ''}
+                </div>
+
+                <div class="allocation-legend">
+                    ${tier1 > 0 ? `
+                    <div class="legend-item">
+                        <div class="legend-color tier-1"></div>
+                        <span class="legend-text">Tier 1: Profit-Seeking</span>
+                        <span class="legend-percent">${formatPercent(tier1, 1)} (${formatNumber(tier1Tokens, 0)})</span>
+                    </div>` : ''}
+                    ${tier2 > 0 ? `
+                    <div class="legend-item">
+                        <div class="legend-color tier-2"></div>
+                        <span class="legend-text">Tier 2: Entity Controlled</span>
+                        <span class="legend-percent">${formatPercent(tier2, 1)} (${formatNumber(tier2Tokens, 0)})</span>
+                    </div>` : ''}
+                    ${tier3 > 0 ? `
+                    <div class="legend-item">
+                        <div class="legend-color tier-3"></div>
+                        <span class="legend-text">Tier 3: Community</span>
+                        <span class="legend-percent">${formatPercent(tier3, 1)} (${formatNumber(tier3Tokens, 0)})</span>
+                    </div>` : ''}
+                    ${tier4 > 0 ? `
+                    <div class="legend-item">
+                        <div class="legend-color tier-4"></div>
+                        <span class="legend-text">Tier 4: Liquidity</span>
+                        <span class="legend-percent">${formatPercent(tier4, 1)} (${formatNumber(tier4Tokens, 0)})</span>
+                    </div>` : ''}
+                    <div class="legend-item">
+                        <div class="legend-color mining"></div>
+                        <span class="legend-text">Available for Mining</span>
+                        <span class="legend-percent">${formatPercent(mining, 1)} (${formatNumber(miningTokens, 0)})</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderDecentralizationPath(data, genesis) {
+    if (!genesis || !genesis.miner_parity_analysis) return '';
+
+    const parity = genesis.miner_parity_analysis;
+    const genesisTotal = parity.genesis_allocation_total || (genesis.total_genesis_allocation_pct / 100) * data.supply.max_supply;
+    const minedToDate = parity.cumulative_mined_to_date || data.supply.current_supply - genesisTotal;
+    const pctTowardParity = parity.pct_toward_parity || ((minedToDate / genesisTotal) * 100);
+    const dailyEmission = parity.daily_emission_current || data.emission.daily_emission;
+
+    // Find parity date from timeline
+    const parityEvent = parity.parity_timeline?.find(event =>
+        event.event && event.event.includes('PARITY')
+    );
+    const parityDate = parityEvent ? parityEvent.date : 'TBD';
+    const daysFromNow = parityEvent?.days_from_oct_2025;
+
+    return `
+        <div style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 1rem; color: var(--text);">⚖️ Path to Decentralization</h3>
+            <div class="data-grid">
+                <div class="data-item">
+                    <span class="data-label">Genesis Allocation</span>
+                    <span class="data-value">${formatNumber(genesisTotal, 0)} ${data.ticker}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Mined to Date</span>
+                    <span class="data-value">${formatNumber(minedToDate, 0)} ${data.ticker}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Progress to Parity</span>
+                    <span class="data-value text-primary">${formatPercent(pctTowardParity, 1)}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Miner Parity Date</span>
+                    <span class="data-value">${parityDate !== 'TBD' ? formatDate(parityDate) : 'TBD'}</span>
+                </div>
+            </div>
+            <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                At current emission rate of ${formatNumber(dailyEmission, 0)} ${data.ticker}/day, miners will match genesis allocation ${parityDate !== 'TBD' ? 'by ' + formatDate(parityDate) : ''}.
+            </p>
+        </div>
+    `;
+}
+
 function renderSupplySection(data) {
     const supply = data.supply;
-    
+
     return `
         <div class="section">
             <div class="section-header">
@@ -163,6 +274,9 @@ function renderSupplySection(data) {
                     <span class="data-value">${formatNumber(supply.emission_remaining, 0)}</span>
                 </div>
             </div>
+
+            ${projectData.has_premine && genesisData ? renderSupplyAllocation(projectData, genesisData) : ''}
+            ${projectData.has_premine && genesisData ? renderDecentralizationPath(projectData, genesisData) : ''}
         </div>
     `;
 }
@@ -170,7 +284,21 @@ function renderSupplySection(data) {
 function renderEmissionSection(data) {
     const emission = data.emission;
     const hasHalvings = emission.halving_schedule && emission.halving_schedule.length > 0;
-    
+
+    // Split events into traditional halvings and narrative milestones
+    let traditionalHalvings = [];
+    let narrativeEvents = [];
+
+    if (hasHalvings) {
+        traditionalHalvings = emission.halving_schedule.filter(event =>
+            event.reward_before && event.reward_after && event.height
+        );
+
+        narrativeEvents = emission.halving_schedule.filter(event =>
+            !event.reward_before || !event.reward_after || !event.height
+        );
+    }
+
     return `
         <div class="section">
             <div class="section-header">
@@ -194,20 +322,21 @@ function renderEmissionSection(data) {
                     <span class="data-value">${formatPercent(emission.annual_inflation_pct, 2)}</span>
                 </div>
             </div>
-            
-            ${hasHalvings ? renderHalvingSchedule(emission.halving_schedule, data.ticker) : ''}
+
+            ${traditionalHalvings.length > 0 ? renderHalvingSchedule(traditionalHalvings, data.ticker) : ''}
+            ${narrativeEvents.length > 0 ? renderEmissionMilestones(narrativeEvents, data.ticker) : ''}
         </div>
     `;
 }
 
 function renderHalvingSchedule(schedule, ticker) {
     const now = new Date();
-    
+
     const rows = schedule.slice(0, 5).map(event => {
         const eventDate = new Date(event.date || event.date_est);
         const isPast = eventDate < now;
         const statusClass = isPast ? 'passed' : '';
-        
+
         return `
             <div class="timeline-event ${statusClass}">
                 <div class="timeline-date">${formatDate(event.date || event.date_est)}</div>
@@ -216,7 +345,7 @@ function renderHalvingSchedule(schedule, ticker) {
             </div>
         `;
     }).join('');
-    
+
     return `
         <div class="vesting-timeline">
             <h3 style="margin-bottom: 1rem; color: var(--text);">Halving Events</h3>
@@ -225,9 +354,60 @@ function renderHalvingSchedule(schedule, ticker) {
     `;
 }
 
+function renderEmissionMilestones(events, ticker) {
+    const now = new Date();
+
+    const rows = events.slice(0, 5).map(event => {
+        // Check if event has a date
+        const hasDate = event.date || event.date_est;
+        const eventDate = hasDate ? new Date(event.date || event.date_est) : null;
+        const isPast = eventDate && eventDate < now;
+        const statusClass = isPast ? 'passed' : '';
+
+        // Format the event name/title
+        const eventName = event.event || event.name || 'Milestone';
+        const formattedEventName = typeof eventName === 'string'
+            ? eventName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+            : eventName;
+
+        return `
+            <div class="timeline-event milestone ${statusClass}">
+                <div class="timeline-date">${hasDate ? formatDate(event.date || event.date_est) : 'TBD'}</div>
+                <div class="timeline-description">
+                    <strong>🎯 ${formattedEventName}</strong>
+                    ${event.description ? `<div style="margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.9;">${event.description}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="vesting-timeline">
+            <h3 style="margin-bottom: 1rem; color: var(--text);">📍 Emission Milestones</h3>
+            ${rows}
+        </div>
+    `;
+}
+
+function formatHashrate(mining) {
+    // Support multiple hashrate units with proper conversion
+    if (mining.current_hashrate_eh) {
+        return formatNumber(mining.current_hashrate_eh, 2) + ' EH/s';
+    }
+    if (mining.current_hashrate_ph) {
+        // Convert PH to TH for display consistency
+        const th = mining.current_hashrate_ph * 1000;
+        return formatNumber(th, 2) + ' TH/s';
+    }
+    if (mining.current_hashrate_th) {
+        return formatNumber(mining.current_hashrate_th, 2) + ' TH/s';
+    }
+    return 'N/A';
+}
+
 function renderMiningSection(data) {
     const mining = data.mining;
-    
+
     return `
         <div class="section">
             <div class="section-header">
@@ -236,7 +416,7 @@ function renderMiningSection(data) {
             <div class="data-grid">
                 <div class="data-item">
                     <span class="data-label">Current Hashrate</span>
-                    <span class="data-value">${formatNumber(mining.current_hashrate_th)} TH/s</span>
+                    <span class="data-value">${formatHashrate(mining)}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">Difficulty</span>
@@ -251,7 +431,7 @@ function renderMiningSection(data) {
                     <span class="data-value">${mining.dominant_hardware}</span>
                 </div>
             </div>
-            
+
             ${mining.cost_to_mine_one_unit ? renderMiningCosts(mining.cost_to_mine_one_unit, data.ticker) : ''}
             ${mining.decentralization ? renderDecentralization(mining.decentralization) : ''}
         </div>
@@ -318,8 +498,9 @@ function renderGenesisSection(genesis) {
                 <h2 class="section-title">🎯 Genesis Allocation</h2>
                 <span class="section-subtitle">${formatPercent(genesis.total_genesis_allocation_pct, 1)} premined</span>
             </div>
-            
+
             ${renderAllocationChart(genesis)}
+            ${renderDecentralizationPath(projectData, genesis)}
             ${renderInvestorDetails(genesis)}
             ${genesis.vesting_waterfall ? renderVestingWaterfall(genesis.vesting_waterfall) : ''}
         </div>
