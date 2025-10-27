@@ -149,27 +149,62 @@ async function fetchProjectList() {
     }
 }
 
+// Normalize project data structure
+// Fixes cases where market_data is incorrectly nested inside mining object
+function normalizeProjectData(projectData) {
+    if (!projectData) return null;
+
+    // Check if market_data is incorrectly nested inside mining
+    if (projectData.mining?.market_data && !projectData.market_data) {
+        projectData.market_data = projectData.mining.market_data;
+        delete projectData.mining.market_data;
+    }
+
+    // Check if data_sources is incorrectly nested inside mining
+    if (projectData.mining?.data_sources && !projectData.data_sources) {
+        projectData.data_sources = projectData.mining.data_sources;
+        delete projectData.mining.data_sources;
+    }
+
+    // Check if notes is incorrectly nested inside mining
+    if (projectData.mining?.notes && !projectData.notes) {
+        projectData.notes = projectData.mining.notes;
+        delete projectData.mining.notes;
+    }
+
+    // Check if last_updated is incorrectly nested inside mining
+    if (projectData.mining?.last_updated && !projectData.last_updated) {
+        projectData.last_updated = projectData.mining.last_updated;
+        delete projectData.mining.last_updated;
+    }
+
+    return projectData;
+}
+
 // Fetch all project data
 async function fetchAllProjects() {
     const projectNames = await fetchProjectList();
-    
+
     if (projectNames.length === 0) {
         console.warn('No projects found. Make sure you have JSON files in data/projects/');
         return [];
     }
-    
+
     const projects = [];
-    
+
     for (const name of projectNames) {
-        const projectData = await fetchFromGitHub(`${CONFIG.PROJECTS_PATH}/${name}.json`);
-        
+        let projectData = await fetchFromGitHub(`${CONFIG.PROJECTS_PATH}/${name}.json`);
+
         if (projectData) {
+            // Normalize the data structure
+            projectData = normalizeProjectData(projectData);
+
             // Fetch genesis data if it exists
             let genesisData = null;
             if (projectData.has_premine) {
                 genesisData = await fetchFromGitHub(`${CONFIG.ALLOCATIONS_PATH}/${name}/genesis.json`);
             }
-            
+
             projects.push({
                 name: name,
                 data: projectData,
@@ -177,7 +212,7 @@ async function fetchAllProjects() {
             });
         }
     }
-    
+
     return projects;
 }
 

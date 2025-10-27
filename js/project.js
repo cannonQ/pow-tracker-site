@@ -18,19 +18,22 @@ async function loadProjectData(projectName) {
     try {
         // Fetch project data
         projectData = await fetchFromGitHub(`${CONFIG.PROJECTS_PATH}/${projectName}.json`);
-        
+
         if (!projectData) {
             showError(document.getElementById('project-content'), 'Project not found');
             return;
         }
-        
+
+        // Normalize the data structure (fixes kaspa and similar data issues)
+        projectData = normalizeProjectData(projectData);
+
         // Fetch genesis data if premine exists
         if (projectData.has_premine) {
             genesisData = await fetchFromGitHub(`${CONFIG.ALLOCATIONS_PATH}/${projectName}/genesis.json`);
         }
-        
+
         renderProjectPage();
-        
+
     } catch (error) {
         console.error('Error loading project:', error);
         showError(document.getElementById('project-content'), 'Failed to load project data');
