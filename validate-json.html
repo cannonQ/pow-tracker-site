@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Validator - Kaspa Debug</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 { color: #00ff00; }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            margin: 10px 5px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button:hover { background: #00cc00; }
+        .error { color: #ff0000; font-weight: bold; }
+        .success { color: #00ff00; font-weight: bold; }
+        .warning { color: #ffaa00; }
+        #output {
+            background: #000;
+            padding: 20px;
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            margin: 20px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .line-number {
+            color: #666;
+            margin-right: 10px;
+            user-select: none;
+        }
+        .error-line {
+            background: #ff000033;
+            padding: 2px 5px;
+            margin: 2px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Kaspa JSON Validator</h1>
+    <div>
+        <button onclick="validateKaspa()">Validate Kaspa JSON</button>
+        <button onclick="clearOutput()">Clear Output</button>
+        <button onclick="showLineByLine()">Show Line by Line</button>
+    </div>
+    <div id="output">Ready to validate...</div>
+
+    <script>
+        const CONFIG = {
+            GITHUB_USER: 'cannonQ',
+            REPO_NAME: 'pow-tokenomics-tracker',
+            BRANCH: 'main',
+            get API_BASE_URL() {
+                return `https://api.github.com/repos/${this.GITHUB_USER}/${this.REPO_NAME}/contents`;
+            },
+            get RAW_BASE_URL() {
+                return `https://raw.githubusercontent.com/${this.GITHUB_USER}/${this.REPO_NAME}/${this.BRANCH}`;
+            },
+            PROJECTS_PATH: 'data/projects'
+        };
+
+        let currentContent = '';
+
+        function log(message, className = 'success') {
+            const output = document.getElementById('output');
+            output.innerHTML += `<div class="${className}">${message}</div>`;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+        }
+
+        async function validateKaspa() {
+            clearOutput();
+            log('🔍 Fetching kaspa.json from GitHub...', 'success');
+            log('═══════════════════════════════════════════════════════════', 'success');
+
+            try {
+                // Try RAW URL first (faster)
+                const rawUrl = `${CONFIG.RAW_BASE_URL}/${CONFIG.PROJECTS_PATH}/kaspa.json`;
+                log(`\nFetching: ${rawUrl}\n`, 'success');
+
+                const response = await fetch(rawUrl);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                currentContent = await response.text();
+                log(`✓ Downloaded ${currentContent.length} characters\n`, 'success');
+
+                // Try to parse
+                log('Attempting to parse JSON...', 'success');
+                try {
+                    const parsed = JSON.parse(currentContent);
+                    log('\n✅ SUCCESS! JSON is VALID!\n', 'success');
+                    log(`Project: ${parsed.project}`, 'success');
+                    log(`Ticker: ${parsed.ticker}`, 'success');
+                    log(`Launch Type: ${parsed.launch_type}`, 'success');
+                    log('\n✨ The kaspa.json file is now fixed!', 'success');
+                    log('Clear your browser cache and refresh index.html', 'warning');
+
+                } catch (parseError) {
+                    log('\n❌ JSON PARSE ERROR:', 'error');
+                    log(`${parseError.message}\n`, 'error');
+
+                    // Try to identify the error location
+                    const match = parseError.message.match(/position (\d+)/);
+                    if (match) {
+                        const pos = parseInt(match[1]);
+                        log(`Error at character position: ${pos}`, 'error');
+
+                        // Show context around error
+                        const start = Math.max(0, pos - 100);
+                        const end = Math.min(currentContent.length, pos + 100);
+                        const context = currentContent.substring(start, end);
+                        const errorChar = currentContent.charAt(pos);
+
+                        log(`\nContext around error:`, 'warning');
+                        log(`"${context}"`, 'warning');
+                        log(`\nCharacter at error position: "${errorChar}" (ASCII ${errorChar.charCodeAt(0)})`, 'error');
+                    }
+
+                    // Try to find line number
+                    const lineMatch = parseError.message.match(/line (\d+)/);
+                    if (lineMatch) {
+                        const lineNum = parseInt(lineMatch[1]);
+                        log(`\nError at line: ${lineNum}`, 'error');
+                        showContextAroundLine(lineNum);
+                    }
+                }
+
+            } catch (error) {
+                log(`\n❌ FETCH ERROR: ${error.message}`, 'error');
+            }
+        }
+
+        function showContextAroundLine(lineNum) {
+            if (!currentContent) {
+                log('No content loaded yet', 'error');
+                return;
+            }
+
+            const lines = currentContent.split('\n');
+            const start = Math.max(0, lineNum - 5);
+            const end = Math.min(lines.length, lineNum + 5);
+
+            log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'warning');
+            log('Context (5 lines before and after error):', 'warning');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n', 'warning');
+
+            for (let i = start; i < end; i++) {
+                const isErrorLine = (i + 1) === lineNum;
+                const lineClass = isErrorLine ? 'error' : 'success';
+                const marker = isErrorLine ? '>>> ' : '    ';
+                log(`${marker}${(i + 1).toString().padStart(4, ' ')}: ${lines[i]}`, lineClass);
+            }
+
+            log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'warning');
+        }
+
+        async function showLineByLine() {
+            if (!currentContent) {
+                await validateKaspa();
+            }
+
+            if (!currentContent) {
+                log('Could not fetch content', 'error');
+                return;
+            }
+
+            clearOutput();
+            log('LINE BY LINE VIEW', 'success');
+            log('═══════════════════════════════════════════════════════════\n', 'success');
+
+            const lines = currentContent.split('\n');
+            lines.forEach((line, index) => {
+                const lineNum = (index + 1).toString().padStart(4, ' ');
+                log(`${lineNum}: ${line}`);
+            });
+        }
+
+        // Auto-run on load
+        window.onload = () => {
+            setTimeout(validateKaspa, 500);
+        };
+    </script>
+</body>
+</html>

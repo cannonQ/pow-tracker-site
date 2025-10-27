@@ -278,6 +278,9 @@ function renderMiningCosts(costs, ticker) {
 }
 
 function renderDecentralization(decentr) {
+    // Handle both formats: largest_pool (legacy) or largest_pool_current (new format)
+    const largestPool = decentr.largest_pool || decentr.largest_pool_current;
+
     return `
         <div style="margin-top: 1.5rem;">
             <h3 style="margin-bottom: 1rem; color: var(--text);">Decentralization Metrics</h3>
@@ -290,10 +293,12 @@ function renderDecentralization(decentr) {
                     <span class="data-label">Top 5 Pools Control</span>
                     <span class="data-value ${decentr.top_5_pools_pct > 50 ? 'text-danger' : 'text-success'}">${formatPercent(decentr.top_5_pools_pct, 1)}</span>
                 </div>
+                ${largestPool ? `
                 <div class="data-item">
                     <span class="data-label">Largest Pool</span>
-                    <span class="data-value">${decentr.largest_pool.name} (${formatPercent(decentr.largest_pool.pct, 1)})</span>
+                    <span class="data-value">${largestPool.name} (${formatPercent(largestPool.pct, 1)})</span>
                 </div>
+                ` : ''}
                 <div class="data-item">
                     <span class="data-label">Nakamoto Coefficient</span>
                     <span class="data-value">${decentr.nakamoto_coefficient}</span>
