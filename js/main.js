@@ -85,10 +85,12 @@ function updateStats() {
     const totalProjects = allProjects.length;
     const fairLaunches = allProjects.filter(p => !p.data.has_premine && p.data.launch_type === 'fair').length;
     const premined = allProjects.filter(p => p.data.has_premine).length;
-    
+    const suspicious = allProjects.filter(p => p.data.launch_type === 'fair_with_suspicion').length;
+
     document.getElementById('total-projects').textContent = totalProjects;
     document.getElementById('fair-launches').textContent = fairLaunches;
     document.getElementById('premined').textContent = premined;
+    document.getElementById('suspicious').textContent = suspicious;
 }
 
 // Render projects
