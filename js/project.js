@@ -321,6 +321,14 @@ function renderCurrentSupplyPieChart(projectData, genesisData) {
         ].filter(Boolean);
     }
 
+    // Normalize percentages to sum to 100% for pie chart display
+    // (percentages above are % of max supply, need to convert to % of current supply)
+    const totalPercent = slices.reduce((sum, slice) => sum + slice.percent, 0);
+    slices = slices.map(slice => ({
+        ...slice,
+        percent: (slice.percent / totalPercent) * 100
+    }));
+
     // Generate conic-gradient CSS
     let gradientStops = [];
     let cumulative = 0;
