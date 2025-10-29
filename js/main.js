@@ -151,7 +151,7 @@ function createProjectCard(project) {
     if (preminePercent > 0) {
         const hasParity = hasMinersAchievedParity(data, genesis);
         const warningClass = hasParity ? 'premine-warning-parity' : 'premine-warning';
-        const parityText = hasParity ? ' (✅ miner parity)' : '';
+        const parityText = hasParity ? ` (${createIcon('check-circle', { size: '14', className: 'inline-icon' })} miner parity)` : '';
 
         // Determine allocation type
         const hasEmission = genesis && genesis.has_emission_allocation;
@@ -159,17 +159,17 @@ function createProjectCard(project) {
 
         premineWarning = `
             <div class="${warningClass}">
-                ⚠️ ${formatPercent(preminePercent, 1)} ${allocationType}${parityText}
+                ${createIcon('alert-triangle', { size: '14', className: 'inline-icon' })} ${formatPercent(preminePercent, 1)} ${allocationType}${parityText}
             </div>
         `;
     }
-    
+
     // Suspicious flag
     let suspiciousNote = '';
     if (data.launch_type === 'fair_with_suspicion') {
         suspiciousNote = `
             <div class="premine-warning">
-                ⚠️ Suspected insider mining
+                ${createIcon('alert-triangle', { size: '14', className: 'inline-icon' })} Suspected insider mining
             </div>
         `;
     }

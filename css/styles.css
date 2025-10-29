@@ -479,3 +479,34 @@ footer p {
 .text-primary { color: var(--primary); }
 .text-muted { color: var(--text-secondary); }
 .font-bold { font-weight: bold; }
+
+/* ==================== LUCIDE ICONS ==================== */
+.lucide-icon,
+i[data-lucide] {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 0.35rem;
+}
+
+/* Inline icons within text */
+.inline-icon {
+    vertical-align: text-bottom;
+    margin-right: 0.35rem;
+}
+
+/* Icon alignment in headings */
+h1 i[data-lucide],
+h2 i[data-lucide],
+h3 i[data-lucide],
+h4 i[data-lucide] {
+    vertical-align: middle;
+    margin-right: 0.5rem;
+}
+
+/* Icon alignment in buttons and links */
+.btn-contribute i[data-lucide],
+button i[data-lucide],
+a i[data-lucide] {
+    vertical-align: middle;
+    margin-right: 0.35rem;
+}
