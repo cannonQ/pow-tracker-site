@@ -66,7 +66,17 @@ function daysSinceLaunch(launchDate) {
 
 // Determine fairness badge
 function getFairnessBadge(project, genesisData = null) {
-    if (project.has_premine) {
+    // Check for emission allocation (like Ergo - treasury via block rewards)
+    if (genesisData && genesisData.has_emission_allocation) {
+        // Check if miners have achieved parity
+        if (hasMinersAchievedParity(project, genesisData)) {
+            return { class: 'badge-emission-parity', text: 'Emission' };
+        }
+        return { class: 'badge-emission', text: 'Emission' };
+    }
+
+    // Check for traditional premine (tokens generated at genesis)
+    if (project.has_premine || (genesisData && genesisData.has_premine)) {
         // Check if miners have achieved parity
         if (hasMinersAchievedParity(project, genesisData)) {
             return { class: 'badge-premine-parity', text: 'Premine' };
@@ -86,24 +96,29 @@ function getFairnessBadge(project, genesisData = null) {
     return { class: 'badge-premine', text: project.launch_type };
 }
 
-// Get premine percentage (0 if fair launch)
+// Get premine/allocation percentage (0 if fair launch)
 function getPreminePercent(project, genesisData) {
+    // Check for emission allocation or traditional premine
+    if (genesisData && genesisData.has_emission_allocation) {
+        return genesisData.total_genesis_allocation_pct || 0;
+    }
     if (!project.has_premine || !genesisData) return 0;
     return genesisData.total_genesis_allocation_pct || 0;
 }
 
-// Check if miners have achieved parity with premine
+// Check if miners have achieved parity with premine/allocation
 function hasMinersAchievedParity(project, genesisData) {
-    // Return false if no premine or missing required data
-    if (!project.has_premine || !genesisData) return false;
+    // Return false if no allocation or missing required data
+    const hasAllocation = project.has_premine || (genesisData && genesisData.has_emission_allocation);
+    if (!hasAllocation || !genesisData) return false;
     if (!project.emission?.daily_emission || !project.supply?.max_supply || !project.launch_date) return false;
 
     const dailyEmission = project.emission.daily_emission;
-    const premineTokens = (genesisData.total_genesis_allocation_pct / 100) * project.supply.max_supply;
+    const allocatedTokens = (genesisData.total_genesis_allocation_pct / 100) * project.supply.max_supply;
     const daysToDate = daysSinceLaunch(project.launch_date);
     const minedToDate = dailyEmission * daysToDate;
 
-    return minedToDate >= premineTokens;
+    return minedToDate >= allocatedTokens;
 }
 
 // Fetch JSON from GitHub using API (avoids CSP sandbox issues with raw.githubusercontent.com)
@@ -311,15 +326,20 @@ function sortProjects(projects, sortBy) {
 // Filter projects
 function filterProjects(projects, filterType, searchTerm = '') {
     let filtered = projects;
-    
+
     // Apply filter
     if (filterType !== 'all') {
         filtered = filtered.filter(project => {
+            const hasEmission = project.genesis && project.genesis.has_emission_allocation;
+            const hasPremine = project.data.has_premine || (project.genesis && project.genesis.has_premine);
+
             switch(filterType) {
                 case 'fair':
-                    return !project.data.has_premine && project.data.launch_type === 'fair';
+                    return !hasPremine && !hasEmission && project.data.launch_type === 'fair';
                 case 'premine':
-                    return project.data.has_premine;
+                    return hasPremine && !hasEmission;
+                case 'emission':
+                    return hasEmission;
                 case 'suspicious':
                     return project.data.launch_type === 'fair_with_suspicion';
                 default:
