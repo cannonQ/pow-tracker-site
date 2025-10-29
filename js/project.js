@@ -2,6 +2,7 @@
 
 let projectData = null;
 let genesisData = null;
+let vestingScheduleData = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const params = getUrlParams();
@@ -30,6 +31,15 @@ async function loadProjectData(projectName) {
         // Fetch genesis data if premine exists
         if (projectData.has_premine) {
             genesisData = await fetchFromGitHub(`${CONFIG.ALLOCATIONS_PATH}/${projectName}/genesis.json`);
+
+            // Try to fetch vesting schedule if available
+            try {
+                vestingScheduleData = await fetchFromGitHub(`${CONFIG.ALLOCATIONS_PATH}/${projectName}/vesting-schedule.json`);
+            } catch (error) {
+                // Vesting schedule is optional, don't fail if not available
+                console.log('No vesting schedule available for this project');
+                vestingScheduleData = null;
+            }
         }
 
         renderProjectPage();
@@ -469,6 +479,7 @@ function renderEmissionSection(data) {
 
             ${traditionalHalvings.length > 0 ? renderHalvingSchedule(traditionalHalvings, data.ticker) : ''}
             ${narrativeEvents.length > 0 ? renderEmissionMilestones(narrativeEvents, data.ticker) : ''}
+            ${vestingScheduleData ? renderVestingSchedule(vestingScheduleData, data) : ''}
         </div>
     `;
 }
@@ -529,6 +540,266 @@ function renderEmissionMilestones(events, ticker) {
         <div class="vesting-timeline">
             <h3 style="margin-bottom: 1rem; color: var(--text);">${createIcon('map-pin', { size: '20', className: 'inline-icon' })} Emission Milestones</h3>
             ${rows}
+        </div>
+    `;
+}
+
+function renderVestingSchedule(vestingData, projectData) {
+    if (!vestingData || !vestingData.monthly_schedule) return '';
+
+    const now = new Date();
+    const genesisDate = new Date(vestingData.genesis_date);
+    const monthsSinceGenesis = Math.floor((now - genesisDate) / (1000 * 60 * 60 * 24 * 30.44));
+
+    // Find current month in schedule
+    let currentUnlocked = 0;
+    let nextUnlockEvent = null;
+
+    vestingData.monthly_schedule.forEach(monthData => {
+        if (monthData.month <= monthsSinceGenesis) {
+            currentUnlocked = monthData.total.cumulative_tokens;
+        } else if (!nextUnlockEvent && monthData.total.unlock_tokens > 0) {
+            nextUnlockEvent = monthData;
+        }
+    });
+
+    const totalAllocation = vestingData.total_genesis_allocation_tokens;
+    const remaining = totalAllocation - currentUnlocked;
+    const progressPct = (currentUnlocked / totalAllocation) * 100;
+
+    // Summary section
+    const summaryHtml = `
+        <div class="vesting-summary">
+            <h3 style="margin-bottom: 1rem; color: var(--text);">${createIcon('unlock', { size: '20', className: 'inline-icon' })} Vesting Schedule Overview</h3>
+
+            <div class="vesting-stats">
+                <div class="vesting-stat-item">
+                    <span class="vesting-stat-label">Vesting Progress</span>
+                    <span class="vesting-stat-value">${formatPercent(progressPct, 1)} Complete</span>
+                </div>
+                <div class="vesting-stat-item">
+                    <span class="vesting-stat-label">Tokens Unlocked</span>
+                    <span class="vesting-stat-value">${formatNumber(currentUnlocked, 0)} ${projectData.ticker}</span>
+                </div>
+                <div class="vesting-stat-item">
+                    <span class="vesting-stat-label">Tokens Remaining</span>
+                    <span class="vesting-stat-value">${formatNumber(remaining, 0)} ${projectData.ticker}</span>
+                </div>
+                ${nextUnlockEvent ? `
+                <div class="vesting-stat-item highlight">
+                    <span class="vesting-stat-label">Next Unlock</span>
+                    <span class="vesting-stat-value">${formatDate(nextUnlockEvent.date)} • ${formatNumber(nextUnlockEvent.total.unlock_tokens, 0)} ${projectData.ticker}</span>
+                </div>
+                ` : ''}
+            </div>
+
+            <div class="vesting-progress-bar">
+                <div class="vesting-progress-fill" style="width: ${progressPct}%"></div>
+            </div>
+        </div>
+    `;
+
+    // Timeline section - group events intelligently
+    const timelineHtml = renderVestingTimeline(vestingData, projectData, monthsSinceGenesis);
+
+    // Tier summary table
+    const tierSummaryHtml = renderVestingTierSummary(vestingData, projectData, monthsSinceGenesis);
+
+    return `
+        ${summaryHtml}
+        ${timelineHtml}
+        ${tierSummaryHtml}
+    `;
+}
+
+function renderVestingTimeline(vestingData, projectData, currentMonth) {
+    const now = new Date();
+    const schedule = vestingData.monthly_schedule;
+
+    // Identify key events to display
+    const keyEvents = [];
+
+    // Always include month 0 (genesis)
+    keyEvents.push(schedule[0]);
+
+    // Add significant unlock events (>5% of total or completion milestones)
+    const totalAllocation = vestingData.total_genesis_allocation_tokens;
+    const threshold = totalAllocation * 0.05;
+
+    schedule.forEach((monthData, index) => {
+        if (index === 0) return; // Already added genesis
+
+        const isSignificant = monthData.total.unlock_tokens > threshold;
+        const isCompletionEvent = monthData.buckets.some(bucket =>
+            bucket.notes && (bucket.notes.toLowerCase().includes('complete') || bucket.cumulative_pct_of_bucket >= 99.9)
+        );
+
+        if (isSignificant || isCompletionEvent) {
+            keyEvents.push(monthData);
+        }
+    });
+
+    // Add yearly checkpoints if we don't have enough events
+    if (keyEvents.length < 8) {
+        [12, 24, 36, 48, 60, 72, 84, 96, 108, 120].forEach(month => {
+            const monthData = schedule.find(m => m.month === month);
+            if (monthData && !keyEvents.includes(monthData)) {
+                keyEvents.push(monthData);
+            }
+        });
+    }
+
+    // Sort by month
+    keyEvents.sort((a, b) => a.month - b.month);
+
+    // Split into past and future
+    const pastEvents = keyEvents.filter(e => e.month <= currentMonth);
+    const futureEvents = keyEvents.filter(e => e.month > currentMonth);
+
+    const pastHtml = pastEvents.length > 0 ? `
+        <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-secondary);">Past Unlock Events</h4>
+        ${pastEvents.map(event => renderVestingTimelineEvent(event, projectData, true)).join('')}
+    ` : '';
+
+    const futureHtml = futureEvents.length > 0 ? `
+        <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-secondary);">Upcoming Unlock Events</h4>
+        ${futureEvents.slice(0, 5).map(event => renderVestingTimelineEvent(event, projectData, false)).join('')}
+    ` : '';
+
+    return `
+        <div class="vesting-timeline">
+            <h3 style="margin-bottom: 1rem; color: var(--text);">Unlock Timeline</h3>
+            ${pastHtml}
+            ${futureHtml}
+        </div>
+    `;
+}
+
+function renderVestingTimelineEvent(monthData, projectData, isPast) {
+    const statusClass = isPast ? 'passed' : '';
+
+    // Group buckets by tier
+    const tier1Buckets = monthData.buckets.filter(b => b.tier === 'tier_1_profit_seeking');
+    const tier2Buckets = monthData.buckets.filter(b => b.tier === 'tier_2_entity_controlled');
+    const tier3Buckets = monthData.buckets.filter(b => b.tier === 'tier_3_community');
+
+    const tier1Total = tier1Buckets.reduce((sum, b) => sum + b.unlock_tokens, 0);
+    const tier2Total = tier2Buckets.reduce((sum, b) => sum + b.unlock_tokens, 0);
+    const tier3Total = tier3Buckets.reduce((sum, b) => sum + b.unlock_tokens, 0);
+
+    let description = '';
+    if (tier1Total > 0) {
+        const bucketNames = tier1Buckets.map(b => b.bucket_name).join(', ');
+        description += `<div class="vesting-tier-line tier-1-text">Tier 1: ${bucketNames} - ${formatNumber(tier1Total, 0)} ${projectData.ticker}</div>`;
+    }
+    if (tier2Total > 0) {
+        const bucketNames = tier2Buckets.map(b => b.bucket_name).join(', ');
+        description += `<div class="vesting-tier-line tier-2-text">Tier 2: ${bucketNames} - ${formatNumber(tier2Total, 0)} ${projectData.ticker}</div>`;
+    }
+    if (tier3Total > 0) {
+        const bucketNames = tier3Buckets.map(b => b.bucket_name).join(', ');
+        description += `<div class="vesting-tier-line tier-3-text">Tier 3: ${bucketNames} - ${formatNumber(tier3Total, 0)} ${projectData.ticker}</div>`;
+    }
+
+    // Add completion notes if any
+    const completions = monthData.buckets.filter(b =>
+        b.notes && (b.notes.toLowerCase().includes('complete') || b.cumulative_pct_of_bucket >= 99.9)
+    );
+    if (completions.length > 0) {
+        description += `<div style="margin-top: 0.5rem; font-style: italic; color: var(--success);">✓ ${completions.map(c => c.bucket_name).join(', ')} vesting complete</div>`;
+    }
+
+    return `
+        <div class="timeline-event vesting-event ${statusClass}">
+            <div class="timeline-date">
+                <div style="font-weight: 600;">${formatDate(monthData.date)}</div>
+                <div style="font-size: 0.8rem; opacity: 0.8;">Month ${monthData.month}</div>
+            </div>
+            <div class="timeline-amount">${formatNumber(monthData.total.unlock_tokens, 0)} ${projectData.ticker}</div>
+            <div class="timeline-description">
+                ${description}
+                <div style="margin-top: 0.5rem; font-size: 0.85rem; opacity: 0.7;">
+                    Cumulative: ${formatNumber(monthData.total.cumulative_tokens, 0)} ${projectData.ticker}
+                    (${formatPercent(monthData.total.cumulative_pct_of_genesis, 1)} of allocation)
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderVestingTierSummary(vestingData, projectData, currentMonth) {
+    if (!vestingData.tier_totals) return '';
+
+    const schedule = vestingData.monthly_schedule;
+    const lastScheduleMonth = schedule[schedule.length - 1];
+
+    const tiers = [];
+
+    // Build tier summary
+    if (vestingData.tier_totals.tier_1_profit_seeking) {
+        const tier = vestingData.tier_totals.tier_1_profit_seeking;
+        const currentData = schedule.find(m => m.month === currentMonth);
+        const tier1Current = currentData?.tier_aggregates?.tier_1_profit_seeking?.cumulative_tokens || 0;
+        const progressPct = (tier1Current / tier.tokens) * 100;
+
+        // Find completion month
+        const completionMonth = schedule.find(m =>
+            m.tier_aggregates?.tier_1_profit_seeking?.cumulative_tokens >= tier.tokens * 0.999
+        );
+
+        tiers.push({
+            name: 'Tier 1: Profit-Seeking',
+            tokens: tier.tokens,
+            pct: tier.pct_of_genesis,
+            completionDate: completionMonth ? completionMonth.date : lastScheduleMonth.date,
+            progress: progressPct,
+            complete: progressPct >= 99,
+            colorClass: 'tier-1'
+        });
+    }
+
+    if (vestingData.tier_totals.tier_2_entity_controlled) {
+        const tier = vestingData.tier_totals.tier_2_entity_controlled;
+        const currentData = schedule.find(m => m.month === currentMonth);
+        const tier2Current = currentData?.tier_aggregates?.tier_2_entity_controlled?.cumulative_tokens || 0;
+        const progressPct = (tier2Current / tier.tokens) * 100;
+
+        const completionMonth = schedule.find(m =>
+            m.tier_aggregates?.tier_2_entity_controlled?.cumulative_tokens >= tier.tokens * 0.999
+        );
+
+        tiers.push({
+            name: 'Tier 2: Entity Controlled',
+            tokens: tier.tokens,
+            pct: tier.pct_of_genesis,
+            completionDate: completionMonth ? completionMonth.date : lastScheduleMonth.date,
+            progress: progressPct,
+            complete: progressPct >= 99,
+            colorClass: 'tier-2'
+        });
+    }
+
+    if (tiers.length === 0) return '';
+
+    return `
+        <div style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 1rem; color: var(--text);">Tier Breakdown Summary</h3>
+            <div class="vesting-tier-summary">
+                ${tiers.map(tier => `
+                    <div class="vesting-tier-summary-row">
+                        <div class="vesting-tier-summary-header">
+                            <span class="vesting-tier-name ${tier.colorClass}-text">${tier.name}</span>
+                            <span class="vesting-tier-allocation">${formatNumber(tier.tokens, 0)} ${projectData.ticker} (${formatPercent(tier.pct, 1)})</span>
+                        </div>
+                        <div class="vesting-tier-summary-details">
+                            <span>Fully Vested: ${formatDate(tier.completionDate)}</span>
+                            <span class="${tier.complete ? 'text-success' : 'text-primary'}">
+                                ${tier.complete ? '✓ 100% Complete' : `${formatPercent(tier.progress, 1)} Complete`}
+                            </span>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
         </div>
     `;
 }

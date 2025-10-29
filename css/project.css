@@ -505,6 +505,124 @@
     color: var(--text);
 }
 
+/* Vesting Schedule Styles */
+.vesting-summary {
+    background: var(--dark-tertiary);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.vesting-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.vesting-stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.vesting-stat-item.highlight {
+    background: rgba(52, 152, 219, 0.1);
+    border: 1px solid var(--primary);
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+
+.vesting-stat-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.vesting-stat-value {
+    font-size: 1.1rem;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.vesting-progress-bar {
+    height: 24px;
+    background: var(--dark-secondary);
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    margin-top: 1rem;
+}
+
+.vesting-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--success));
+    transition: width 0.5s ease;
+    border-radius: 12px;
+}
+
+.vesting-event {
+    border-left-color: var(--primary);
+}
+
+.vesting-tier-line {
+    padding: 0.25rem 0;
+    font-size: 0.9rem;
+}
+
+.tier-1-text {
+    color: var(--tier-1-color);
+}
+
+.tier-2-text {
+    color: var(--tier-2-color);
+}
+
+.tier-3-text {
+    color: var(--tier-3-color);
+}
+
+.vesting-tier-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.vesting-tier-summary-row {
+    background: var(--dark-tertiary);
+    border-radius: 8px;
+    padding: 1.25rem;
+}
+
+.vesting-tier-summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.vesting-tier-name {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.vesting-tier-allocation {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.vesting-tier-summary-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.vesting-tier-summary-details span:last-child {
+    font-weight: 600;
+}
+
 @media (max-width: 768px) {
     .project-hero-header {
         flex-direction: column;
@@ -556,5 +674,22 @@
 
     .pie-chart-legend {
         width: 100%;
+    }
+
+    /* Vesting mobile styles */
+    .vesting-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .vesting-tier-summary-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .vesting-tier-summary-details {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
     }
 }
