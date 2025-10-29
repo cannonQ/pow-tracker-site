@@ -83,13 +83,25 @@ async function fetchAndCacheProjects() {
 // Update hero stats
 function updateStats() {
     const totalProjects = allProjects.length;
-    const fairLaunches = allProjects.filter(p => !p.data.has_premine && p.data.launch_type === 'fair').length;
-    const premined = allProjects.filter(p => p.data.has_premine).length;
+
+    // Categorize projects based on allocation type
+    const emission = allProjects.filter(p => p.genesis && p.genesis.has_emission_allocation).length;
+    const premined = allProjects.filter(p => {
+        const hasEmission = p.genesis && p.genesis.has_emission_allocation;
+        const hasPremine = p.data.has_premine || (p.genesis && p.genesis.has_premine);
+        return hasPremine && !hasEmission;
+    }).length;
+    const fairLaunches = allProjects.filter(p => {
+        const hasEmission = p.genesis && p.genesis.has_emission_allocation;
+        const hasPremine = p.data.has_premine || (p.genesis && p.genesis.has_premine);
+        return !hasPremine && !hasEmission && p.data.launch_type === 'fair';
+    }).length;
     const suspicious = allProjects.filter(p => p.data.launch_type === 'fair_with_suspicion').length;
 
     document.getElementById('total-projects').textContent = totalProjects;
     document.getElementById('fair-launches').textContent = fairLaunches;
     document.getElementById('premined').textContent = premined;
+    document.getElementById('emission').textContent = emission;
     document.getElementById('suspicious').textContent = suspicious;
 }
 
@@ -134,16 +146,20 @@ function createProjectCard(project) {
     const fdmc = data.market_data?.fdmc;
     const price = data.market_data?.current_price_usd;
     
-    // Build premine warning if needed
+    // Build allocation warning if needed
     let premineWarning = '';
     if (preminePercent > 0) {
         const hasParity = hasMinersAchievedParity(data, genesis);
         const warningClass = hasParity ? 'premine-warning-parity' : 'premine-warning';
         const parityText = hasParity ? ' (✅ miner parity)' : '';
 
+        // Determine allocation type
+        const hasEmission = genesis && genesis.has_emission_allocation;
+        const allocationType = hasEmission ? 'emission allocation' : 'premine';
+
         premineWarning = `
             <div class="${warningClass}">
-                ⚠️ ${formatPercent(preminePercent, 1)} premine${parityText}
+                ⚠️ ${formatPercent(preminePercent, 1)} ${allocationType}${parityText}
             </div>
         `;
     }

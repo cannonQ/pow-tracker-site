@@ -285,6 +285,18 @@ a:hover {
     border: 1px solid var(--warning);
 }
 
+.badge-emission {
+    background: rgba(52, 152, 219, 0.2);
+    color: #3498db;
+    border: 1px solid #3498db;
+}
+
+.badge-emission-parity {
+    background: rgba(52, 152, 219, 0.15);
+    color: #5dade2;
+    border: 1px solid #5dade2;
+}
+
 .project-stats {
     margin: 1rem 0;
 }

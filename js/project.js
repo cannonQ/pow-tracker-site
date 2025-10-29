@@ -81,10 +81,14 @@ function renderWarningBanner(data, preminePercent) {
         const hasParity = hasMinersAchievedParity(data, genesisData);
         const bannerClass = hasParity ? 'warning-banner parity' : 'warning-banner';
 
+        // Determine allocation type
+        const hasEmission = genesisData && genesisData.has_emission_allocation;
+        const allocationType = hasEmission ? 'emission allocation' : 'premine allocation';
+
         return `
             <div class="${bannerClass}">
-                ⚠️ <strong>WARNING:</strong> ${formatPercent(preminePercent, 1)} premine allocation
-                ${genesisData ? calculateParityWarning(data, genesisData) : ''}
+                ⚠️ <strong>WARNING:</strong> ${formatPercent(preminePercent, 1)} ${allocationType}
+                ${genesisData ? calculateParityWarning(data, genesisData, hasEmission) : ''}
             </div>
         `;
     }
@@ -100,19 +104,19 @@ function renderWarningBanner(data, preminePercent) {
     return '';
 }
 
-function calculateParityWarning(data, genesis) {
+function calculateParityWarning(data, genesis, hasEmission = false) {
     const dailyEmission = data.emission.daily_emission;
-    const premineTokens = (genesis.total_genesis_allocation_pct / 100) * data.supply.max_supply;
+    const allocatedTokens = (genesis.total_genesis_allocation_pct / 100) * data.supply.max_supply;
     const daysToDate = daysSinceLaunch(data.launch_date);
     const minedToDate = dailyEmission * daysToDate;
-    
-    if (minedToDate >= premineTokens) {
+
+    if (minedToDate >= allocatedTokens) {
         return ` | ✅ Miners achieved parity`;
     }
-    
-    const daysRemaining = Math.ceil((premineTokens - minedToDate) / dailyEmission);
+
+    const daysRemaining = Math.ceil((allocatedTokens - minedToDate) / dailyEmission);
     const yearsRemaining = (daysRemaining / 365).toFixed(1);
-    
+
     return ` | Miner parity in ${yearsRemaining} years`;
 }
 
@@ -126,15 +130,16 @@ function calculateMinedPercent(projectData, genesisData) {
     const currentSupplyPct = (currentSupply / maxSupply) * 100;
 
     // For fair launches, % mined equals current supply %
-    if (!projectData.has_premine || !genesisData) {
+    const hasAllocation = projectData.has_premine || (genesisData && (genesisData.has_premine || genesisData.has_emission_allocation));
+    if (!hasAllocation || !genesisData) {
         return currentSupplyPct;
     }
 
-    // Calculate % mined excluding premine
-    const preminePct = genesisData.total_genesis_allocation_pct || 0;
-    const minedPct = currentSupplyPct - preminePct;
+    // Calculate % mined excluding premine/emission allocation
+    const allocationPct = genesisData.total_genesis_allocation_pct || 0;
+    const minedPct = currentSupplyPct - allocationPct;
 
-    // Cap at 0% if premine exceeds current supply (early stage projects)
+    // Cap at 0% if allocation exceeds current supply (early stage projects)
     return Math.max(0, minedPct);
 }
 
@@ -290,13 +295,15 @@ function renderCurrentSupplyPieChart(projectData, genesisData) {
 
     let slices = [];
 
-    if (!projectData.has_premine || !genesisData) {
+    const hasAllocation = projectData.has_premine || (genesisData && (genesisData.has_premine || genesisData.has_emission_allocation));
+
+    if (!hasAllocation || !genesisData) {
         // Fair launch: 100% mined
         slices = [
             { label: 'Mined (Block Rewards)', percent: currentSupplyPct, class: 'mining', tokens: currentSupply }
         ];
     } else {
-        // Premine: Calculate breakdown
+        // Premine or Emission: Calculate breakdown
         const tiers = genesisData.allocation_tiers;
         const tier1Pct = tiers.tier_1_profit_seeking?.total_pct || 0;
         const tier2Pct = tiers.tier_2_entity_controlled?.total_pct || 0;
@@ -358,7 +365,7 @@ function renderCurrentSupplyPieChart(projectData, genesisData) {
                 </div>
             </div>
             <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
-                Current supply distribution showing ${projectData.has_premine ? 'premine allocations vs miner rewards' : 'mined tokens'} out of ${formatNumber(currentSupply, 0)} ${projectData.ticker} total.
+                Current supply distribution showing ${projectData.has_premine ? (genesisData?.has_emission_allocation ? 'emission allocations vs miner rewards' : 'premine allocations vs miner rewards') : 'mined tokens'} out of ${formatNumber(currentSupply, 0)} ${projectData.ticker} total.
             </p>
         </div>
     `;
@@ -406,7 +413,7 @@ function renderSupplySection(data) {
                             <span class="data-label">% Mined</span>
                             <span class="data-value text-primary">${formatPercent(minedPct, 2)}</span>
                         </div>
-                        <div class="data-description">Miner block rewards only (excludes ${data.has_premine ? 'premine' : 'any allocations'})</div>
+                        <div class="data-description">Miner block rewards only (excludes ${data.has_premine ? (genesisData?.has_emission_allocation ? 'emission allocation' : 'premine') : 'any allocations'})</div>
                     </div>
                 </div>
             </div>
