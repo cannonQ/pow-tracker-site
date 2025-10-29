@@ -1,5 +1,31 @@
 // Utility functions for the PoW Tokenomics Tracker
 
+/**
+ * Create a Lucide icon element
+ * @param {string} iconName - The name of the Lucide icon (e.g., 'pickaxe', 'alert-triangle', 'check-circle')
+ * @param {Object} options - Optional configuration
+ * @param {string} options.size - Size of the icon (default: '16')
+ * @param {string} options.color - Color of the icon
+ * @param {string} options.className - Additional CSS classes
+ * @param {string} options.strokeWidth - Stroke width (default: '2')
+ * @returns {string} HTML string for the icon
+ */
+function createIcon(iconName, options = {}) {
+    const {
+        size = '16',
+        color = 'currentColor',
+        className = '',
+        strokeWidth = '2'
+    } = options;
+
+    return `<i data-lucide="${iconName}"
+               class="lucide-icon ${className}"
+               stroke-width="${strokeWidth}"
+               width="${size}"
+               height="${size}"
+               ${color !== 'currentColor' ? `style="color: ${color}"` : ''}></i>`;
+}
+
 // Format large numbers (e.g., 1500000000 -> 1.5B)
 function formatNumber(num, decimals = 2) {
     if (num === null || num === undefined) return 'N/A';
@@ -378,7 +404,7 @@ function buildProjectUrl(projectName) {
 function showError(container, message) {
     container.innerHTML = `
         <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
-            <h3>⚠️ Error Loading Data</h3>
+            <h3>${createIcon('alert-triangle', { size: '24', className: 'inline-icon' })} Error Loading Data</h3>
             <p>${message}</p>
             <p style="margin-top: 1rem;">
                 Make sure you've updated <code>js/config.js</code> with your GitHub username and repo name.

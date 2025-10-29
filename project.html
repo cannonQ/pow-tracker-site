@@ -11,7 +11,7 @@
         <div class="container">
             <div class="header-content">
                 <a href="index.html" style="text-decoration: none; color: inherit;">
-                    <h1>⛏️ PoW Tokenomics Tracker</h1>
+                    <h1><i data-lucide="pickaxe" width="28" height="28"></i> PoW Tokenomics Tracker</h1>
                     <p class="tagline">Show the data. Let users judge fairness.</p>
                 </a>
             </div>
@@ -37,7 +37,7 @@
 
         <!-- Error State -->
         <div id="errorState" class="error-state" style="display: none;">
-            <p>❌ Failed to load project data.</p>
+            <p><i data-lucide="x-circle" width="20" height="20"></i> Failed to load project data.</p>
             <button onclick="history.back()">Go Back</button>
         </div>
 
@@ -63,7 +63,7 @@
                 
                 <!-- Warning Banner (if premine) -->
                 <div id="warningBanner" class="warning-banner" style="display: none;">
-                    <strong>⚠️ WARNING:</strong> <span id="warningText"></span>
+                    <strong><i data-lucide="alert-triangle" width="18" height="18"></i> WARNING:</strong> <span id="warningText"></span>
                 </div>
             </section>
 
@@ -92,7 +92,7 @@
 
             <!-- Supply & Emission -->
             <section class="data-section">
-                <h3>📊 Supply & Emission</h3>
+                <h3><i data-lucide="bar-chart-2" width="24" height="24"></i> Supply & Emission</h3>
                 <div class="data-grid">
                     <div class="data-item">
                         <span class="data-label">Max Supply:</span>
@@ -119,7 +119,7 @@
 
             <!-- Genesis Allocation (if premine) -->
             <section id="genesisSection" class="data-section" style="display: none;">
-                <h3>🎯 Genesis Allocation</h3>
+                <h3><i data-lucide="target" width="24" height="24"></i> Genesis Allocation</h3>
                 <div class="allocation-chart" id="allocationChart">
                     <!-- Chart will be inserted by JS -->
                 </div>
@@ -130,7 +130,7 @@
 
             <!-- Miner Parity Timeline (if premine) -->
             <section id="paritySection" class="data-section" style="display: none;">
-                <h3>⏱️ Miner Parity Timeline</h3>
+                <h3><i data-lucide="clock" width="24" height="24"></i> Miner Parity Timeline</h3>
                 <p class="section-description">When will miners have mined as much as each premine tier?</p>
                 <div class="parity-table" id="parityTable">
                     <!-- Table will be inserted by JS -->
@@ -139,7 +139,7 @@
 
             <!-- Mining Economics -->
             <section class="data-section">
-                <h3>⛏️ Mining Economics</h3>
+                <h3><i data-lucide="pickaxe" width="24" height="24"></i> Mining Economics</h3>
                 <div class="data-grid">
                     <div class="data-item">
                         <span class="data-label">Hashrate:</span>
@@ -162,7 +162,7 @@
 
             <!-- Decentralization -->
             <section class="data-section">
-                <h3>🌐 Decentralization</h3>
+                <h3><i data-lucide="globe" width="24" height="24"></i> Decentralization</h3>
                 <div class="data-grid">
                     <div class="data-item">
                         <span class="data-label">Active Pools:</span>
@@ -185,7 +185,7 @@
 
             <!-- Notes -->
             <section id="notesSection" class="data-section" style="display: none;">
-                <h3>📝 Notes</h3>
+                <h3><i data-lucide="file-text" width="24" height="24"></i> Notes</h3>
                 <ul id="notesList" class="notes-list">
                     <!-- Notes will be inserted by JS -->
                 </ul>
@@ -193,7 +193,7 @@
 
             <!-- Data Sources -->
             <section class="data-section">
-                <h3>🔗 Data Sources</h3>
+                <h3><i data-lucide="link" width="24" height="24"></i> Data Sources</h3>
                 <div id="sourcesContainer" class="sources-container">
                     <!-- Sources will be inserted by JS -->
                 </div>
@@ -213,9 +213,14 @@
         </div>
     </footer>
 
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script src="js/config.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/project.js"></script>
+    <script>
+        // Initialize Lucide icons after page load
+        lucide.createIcons();
+    </script>
 </body>
 </html>
 

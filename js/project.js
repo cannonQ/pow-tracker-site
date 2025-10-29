@@ -87,7 +87,7 @@ function renderWarningBanner(data, preminePercent) {
 
         return `
             <div class="${bannerClass}">
-                ⚠️ <strong>WARNING:</strong> ${formatPercent(preminePercent, 1)} ${allocationType}
+                ${createIcon('alert-triangle', { size: '18', className: 'inline-icon' })} <strong>WARNING:</strong> ${formatPercent(preminePercent, 1)} ${allocationType}
                 ${genesisData ? calculateParityWarning(data, genesisData, hasEmission) : ''}
             </div>
         `;
@@ -96,7 +96,7 @@ function renderWarningBanner(data, preminePercent) {
     if (data.launch_type === 'fair_with_suspicion') {
         return `
             <div class="warning-banner suspicious">
-                ⚠️ <strong>CAUTION:</strong> Suspected insider mining activity
+                ${createIcon('alert-triangle', { size: '18', className: 'inline-icon' })} <strong>CAUTION:</strong> Suspected insider mining activity
             </div>
         `;
     }
@@ -111,7 +111,7 @@ function calculateParityWarning(data, genesis, hasEmission = false) {
     const minedToDate = dailyEmission * daysToDate;
 
     if (minedToDate >= allocatedTokens) {
-        return ` | ✅ Miners achieved parity`;
+        return ` | ${createIcon('check-circle', { size: '16', className: 'inline-icon' })} Miners achieved parity`;
     }
 
     const daysRemaining = Math.ceil((allocatedTokens - minedToDate) / dailyEmission);
@@ -259,7 +259,7 @@ function renderDecentralizationPath(data, genesis) {
 
     return `
         <div style="margin-top: 2rem;">
-            <h3 style="margin-bottom: 1rem; color: var(--text);">⚖️ Path to Decentralization</h3>
+            <h3 style="margin-bottom: 1rem; color: var(--text);">${createIcon('scale', { size: '20', className: 'inline-icon' })} Path to Decentralization</h3>
             <div class="data-grid">
                 <div class="data-item">
                     <span class="data-label">Genesis Allocation</span>
@@ -381,7 +381,7 @@ function renderSupplySection(data) {
     return `
         <div class="section">
             <div class="section-header">
-                <h2 class="section-title">📊 Supply Metrics</h2>
+                <h2 class="section-title">${createIcon('bar-chart-2', { size: '24', className: 'inline-icon' })} Supply Metrics</h2>
             </div>
             <div class="data-grid">
                 <div class="data-item">
@@ -446,7 +446,7 @@ function renderEmissionSection(data) {
     return `
         <div class="section">
             <div class="section-header">
-                <h2 class="section-title">⏱️ Emission Schedule</h2>
+                <h2 class="section-title">${createIcon('clock', { size: '24', className: 'inline-icon' })} Emission Schedule</h2>
             </div>
             <div class="data-grid">
                 <div class="data-item">
@@ -518,7 +518,7 @@ function renderEmissionMilestones(events, ticker) {
             <div class="timeline-event milestone ${statusClass}">
                 <div class="timeline-date">${hasDate ? formatDate(event.date || event.date_est) : 'TBD'}</div>
                 <div class="timeline-description">
-                    <strong>🎯 ${formattedEventName}</strong>
+                    <strong>${createIcon('target', { size: '16', className: 'inline-icon' })} ${formattedEventName}</strong>
                     ${event.description ? `<div style="margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.9;">${event.description}</div>` : ''}
                 </div>
             </div>
@@ -527,7 +527,7 @@ function renderEmissionMilestones(events, ticker) {
 
     return `
         <div class="vesting-timeline">
-            <h3 style="margin-bottom: 1rem; color: var(--text);">📍 Emission Milestones</h3>
+            <h3 style="margin-bottom: 1rem; color: var(--text);">${createIcon('map-pin', { size: '20', className: 'inline-icon' })} Emission Milestones</h3>
             ${rows}
         </div>
     `;
@@ -555,7 +555,7 @@ function renderMiningSection(data) {
     return `
         <div class="section">
             <div class="section-header">
-                <h2 class="section-title">⛏️ Mining Economics</h2>
+                <h2 class="section-title">${createIcon('pickaxe', { size: '24', className: 'inline-icon' })} Mining Economics</h2>
             </div>
             <div class="data-grid">
                 <div class="data-item">
@@ -639,7 +639,7 @@ function renderGenesisSection(genesis) {
     return `
         <div class="section">
             <div class="section-header">
-                <h2 class="section-title">🎯 Genesis Allocation</h2>
+                <h2 class="section-title">${createIcon('target', { size: '24', className: 'inline-icon' })} Genesis Allocation</h2>
                 <span class="section-subtitle">${formatPercent(genesis.total_genesis_allocation_pct, 1)} premined</span>
             </div>
 
@@ -763,7 +763,7 @@ function renderMarketSection(data) {
         return `
             <div class="section">
                 <div class="section-header">
-                    <h2 class="section-title">💰 Market Data</h2>
+                    <h2 class="section-title">${createIcon('dollar-sign', { size: '24', className: 'inline-icon' })} Market Data</h2>
                 </div>
                 <p style="color: var(--text-secondary); padding: 1rem;">Market data not available</p>
             </div>
@@ -773,7 +773,7 @@ function renderMarketSection(data) {
     return `
         <div class="section">
             <div class="section-header">
-                <h2 class="section-title">💰 Market Data</h2>
+                <h2 class="section-title">${createIcon('dollar-sign', { size: '24', className: 'inline-icon' })} Market Data</h2>
             </div>
             <div class="data-grid">
                 <div class="data-item">
@@ -809,7 +809,7 @@ function renderNotesSection(data) {
     return `
         <div class="section">
             <div class="section-header">
-                <h2 class="section-title">📝 Notes & Context</h2>
+                <h2 class="section-title">${createIcon('file-text', { size: '24', className: 'inline-icon' })} Notes & Context</h2>
             </div>
             <ul class="notes-list">
                 ${notes}
@@ -848,7 +848,7 @@ function renderSourcesSection(data) {
     return `
         <div class="section">
             <div class="section-header">
-                <h2 class="section-title">🔗 Data Sources</h2>
+                <h2 class="section-title">${createIcon('link', { size: '24', className: 'inline-icon' })} Data Sources</h2>
             </div>
             <div class="source-links">
                 ${links}
