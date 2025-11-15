@@ -136,91 +136,68 @@ function renderProjects() {
 function createProjectCard(project) {
     const data = project.data;
     const genesis = project.genesis;
-    const badge = getFairnessBadge(data, genesis);
-    const preminePercent = getPreminePercent(data, genesis);
-    
-    // Mining progress
-    const pctMined = data.supply?.pct_mined || 0;
-    
+
+    // Calculate composition and border color
+    const composition = calculateCirculatingComposition(project);
+    const borderColor = getCardBorderColor(composition.allocationPctTotal);
+    const badge = getLaunchBadgeV2(data, genesis);
+
+    // Format launch info
+    const launchAge = formatLaunchAge(data.launch_date);
+    const launchText = `${formatDate(data.launch_date)} (${launchAge})`;
+
     // Market data
     const fdmc = data.market_data?.fdmc;
-    const price = data.market_data?.current_price_usd;
-    
-    // Build allocation warning if needed
-    let premineWarning = '';
-    if (preminePercent > 0) {
-        const hasParity = hasMinersAchievedParity(data, genesis);
-        const warningClass = hasParity ? 'premine-warning-parity' : 'premine-warning';
-        const parityText = hasParity ? ` (${createIcon('check-circle', { size: '14', className: 'inline-icon' })} miner parity)` : '';
+    // const price = data.market_data?.current_price_usd;  // Commented out for future use
 
-        // Determine allocation type
-        const hasEmission = genesis && genesis.has_emission_allocation;
-        const allocationType = hasEmission ? 'emission allocation' : 'premine';
+    // Coin symbol fallback (first letter in yellow circle)
+    const coinSymbol = data.ticker.charAt(0).toUpperCase();
 
-        premineWarning = `
-            <div class="${warningClass}">
-                ${createIcon('alert-triangle', { size: '14', className: 'inline-icon' })} ${formatPercent(preminePercent, 1)} ${allocationType}${parityText}
-            </div>
-        `;
-    }
+    // Determine segment color classes based on allocation type
+    const allocationSegmentClass = composition.isEmission ? 'composition-segment-emission' : 'composition-segment-premine';
 
-    // Suspicious flag
-    let suspiciousNote = '';
-    if (data.launch_type === 'fair_with_suspicion') {
-        suspiciousNote = `
-            <div class="premine-warning">
-                ${createIcon('alert-triangle', { size: '14', className: 'inline-icon' })} Suspected insider mining
-            </div>
-        `;
-    }
-    
     return `
-        <div class="project-card">
-            <div class="project-header">
-                <div class="project-title">
-                    <h3>${capitalize(data.project)}</h3>
-                    <span class="project-ticker">$${data.ticker}</span>
+        <div class="project-card" style="border-color: ${borderColor}">
+            <div class="card-top-row">
+                <div class="project-name-ticker">
+                    <span class="card-project-name">${capitalize(data.project)}</span>
+                    <span class="card-ticker">$${data.ticker}</span>
                 </div>
-                <span class="fairness-badge ${badge.class}">${badge.text}</span>
-            </div>
-            
-            <div class="project-stats">
-                <div class="stat-row">
-                    <span>Consensus</span>
-                    <span>${data.consensus} (${data.algorithm})</span>
+
+                <div class="coin-symbol-fallback">
+                    ${coinSymbol}
                 </div>
-                <div class="stat-row">
-                    <span>Launch Date</span>
-                    <span>${formatDate(data.launch_date)}</span>
-                </div>
-                <div class="stat-row">
-                    <span>Price</span>
-                    <span>${formatCurrency(price)}</span>
-                </div>
-                <div class="stat-row">
-                    <span>FDMC</span>
-                    <span>${formatCurrency(fdmc)}</span>
-                </div>
-                <div class="stat-row">
-                    <span>% of Max Supply</span>
-                    <span class="text-primary font-bold">${formatPercent(pctMined, 1)}</span>
+
+                <div class="launch-badge ${badge.class}">
+                    ${badge.icon} ${badge.text}
                 </div>
             </div>
-            
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: ${pctMined}%"></div>
+
+            <div class="composition-section">
+                <div class="composition-label">Circulating Supply:</div>
+                <div class="composition-bar">
+                    ${composition.preminePct > 0 ? `
+                        <div class="${allocationSegmentClass}" style="width: ${composition.preminePct}%">
+                            ${composition.preminePct > 10 ? Math.round(composition.preminePct) + '%' : ''}
+                        </div>
+                    ` : ''}
+                    <div class="composition-segment-mined" style="width: ${composition.minedPct}%">
+                        ${composition.minedPct > 10 ? Math.round(composition.minedPct) + '%' : ''}
+                    </div>
+                </div>
+                <div class="composition-legend">
+                    ${composition.preminePct > 0 ? `<span>${composition.isEmission ? 'Emission' : 'Premine'}</span>` : ''}
+                    <span ${composition.preminePct === 0 ? 'style="margin: 0 auto;"' : ''}>Mined</span>
+                </div>
             </div>
-            
-            ${premineWarning}
-            ${suspiciousNote}
-            
-            <div class="project-meta">
-                <span>Updated ${formatDate(data.last_updated)}</span>
-                <span>${daysSinceLaunch(data.launch_date)} days old</span>
+
+            <div class="card-bottom-row">
+                <div class="launch-info">${launchText}</div>
+                <div class="fdmc-info">FDMC: ${formatCurrency(fdmc)}</div>
             </div>
-            
+
             <a href="${buildProjectUrl(project.name)}" class="view-details">
-                View Deep Dive →
+                View Details →
             </a>
         </div>
     `;

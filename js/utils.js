@@ -147,6 +147,129 @@ function hasMinersAchievedParity(project, genesisData) {
     return minedToDate >= allocatedTokens;
 }
 
+// Calculate circulating supply composition (premine vs mined percentages)
+function calculateCirculatingComposition(project) {
+    const supply = project.data.supply;
+    const genesis = project.genesis;
+
+    if (!supply?.current_supply || !supply?.max_supply) {
+        return {
+            preminePct: 0,
+            minedPct: 100,
+            isEmission: false,
+            totalCirculating: 0,
+            allocationPctTotal: 0
+        };
+    }
+
+    // Current supply as % of max
+    const currentSupplyPct = (supply.current_supply / supply.max_supply) * 100;
+
+    // Fair launch: 100% mined
+    const hasAllocation = project.data.has_premine || genesis?.has_premine || genesis?.has_emission_allocation;
+    if (!hasAllocation || !genesis) {
+        return {
+            preminePct: 0,
+            minedPct: 100,
+            isEmission: false,
+            totalCirculating: currentSupplyPct,
+            allocationPctTotal: 0
+        };
+    }
+
+    // Get allocation percentage
+    const allocationPct = genesis.total_genesis_allocation_pct || 0;
+    const minedPct = Math.max(0, currentSupplyPct - allocationPct);
+
+    // Normalize to show % of circulating (not % of max)
+    const totalCirculating = allocationPct + minedPct;
+    const allocOfCirculating = totalCirculating > 0 ? (allocationPct / totalCirculating) * 100 : 0;
+    const minedOfCirculating = totalCirculating > 0 ? (minedPct / totalCirculating) * 100 : 100;
+
+    return {
+        preminePct: allocOfCirculating,
+        minedPct: minedOfCirculating,
+        isEmission: genesis.has_emission_allocation || false,
+        totalCirculating: currentSupplyPct,
+        allocationPctTotal: allocationPct
+    };
+}
+
+// Format launch age (e.g., "6yr" or "8mo")
+function formatLaunchAge(launchDateString) {
+    if (!launchDateString) return 'N/A';
+
+    const launchDate = new Date(launchDateString);
+    const now = new Date();
+
+    const diffMonths = (now.getFullYear() - launchDate.getFullYear()) * 12
+                     + now.getMonth() - launchDate.getMonth();
+
+    const years = Math.floor(diffMonths / 12);
+    const months = diffMonths % 12;
+
+    if (years >= 1) {
+        return `${years}yr`;
+    } else {
+        return `${months}mo`;
+    }
+}
+
+// Get card border color based on premine percentage
+function getCardBorderColor(preminePct) {
+    if (preminePct === 0) return '#10B981';  // Green - Fair Launch
+    if (preminePct < 5) return '#10B981';     // Green - Minimal premine
+    if (preminePct >= 5 && preminePct < 15) return '#F59E0B';  // Yellow - Moderate
+    return '#DC2626';  // Red - High premine
+}
+
+// Get launch badge for cards (V2 with Lucide icons)
+function getLaunchBadgeV2(project, genesisData = null) {
+    const preminePercent = getPreminePercent(project, genesisData);
+
+    // Check for emission allocation (like Ergo - treasury via block rewards)
+    if (genesisData && genesisData.has_emission_allocation) {
+        return {
+            icon: createIcon('coins', { size: '12' }),
+            text: `${Math.round(preminePercent)}% Emission`,
+            class: 'badge-emission'
+        };
+    }
+
+    // Check for traditional premine (tokens generated at genesis)
+    if (project.has_premine || (genesisData && genesisData.has_premine)) {
+        return {
+            icon: createIcon('alert-triangle', { size: '12' }),
+            text: `${Math.round(preminePercent)}% Premine`,
+            class: 'badge-premine'
+        };
+    }
+
+    // Check for suspected insider mining
+    if (project.launch_type === 'fair_with_suspicion') {
+        return {
+            icon: createIcon('alert-circle', { size: '12' }),
+            text: 'Suspicious',
+            class: 'badge-suspicious'
+        };
+    }
+
+    // Fair launch
+    if (project.launch_type === 'fair') {
+        return {
+            icon: createIcon('check-circle', { size: '12' }),
+            text: 'Fair Launch',
+            class: 'badge-fair'
+        };
+    }
+
+    return {
+        icon: createIcon('help-circle', { size: '12' }),
+        text: project.launch_type,
+        class: 'badge-premine'
+    };
+}
+
 // Fetch JSON from GitHub using API (avoids CSP sandbox issues with raw.githubusercontent.com)
 async function fetchFromGitHub(path) {
     // Use GitHub API instead of raw URLs to avoid CSP sandbox restrictions
