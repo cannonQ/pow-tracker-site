@@ -119,41 +119,42 @@ function renderProjectPage() {
         { id: 'market', label: 'Market', condition: true }
     ].filter(s => s.condition);
 
+    // Get border color based on premine percentage
+    const borderColor = getCardBorderColor(preminePercent);
+
     let html = `
         ${renderSectionNav(sections, projectData.project)}
 
-        <div class="project-hero" id="hero">
-            <div class="project-hero-header">
-                <div class="project-hero-title">
+        <div class="project-hero" id="hero" style="border-color: ${borderColor};">
+            <div class="project-hero-header-inline">
+                <div class="project-hero-title-inline">
                     <h1>${capitalize(projectData.project)}</h1>
                     <span class="ticker">$${projectData.ticker}</span>
                 </div>
-                <span class="fairness-badge ${badge.class}">${badge.text}</span>
+                ${renderWarningBanner(projectData, preminePercent, borderColor)}
             </div>
-
-            ${renderWarningBanner(projectData, preminePercent)}
 
             <div class="key-metrics">
                 ${renderKeyMetrics(projectData)}
             </div>
         </div>
 
-        <div id="supply">${renderSupplySection(projectData)}</div>
-        <div id="emission">${renderEmissionSection(projectData)}</div>
+        <div id="supply">${renderSupplySection(projectData, borderColor)}</div>
+        <div id="emission">${renderEmissionSection(projectData, borderColor)}</div>
 
         ${/* Mining section commented out per requirements */'' /* ${renderMiningSection(projectData)} */}
 
         ${projectData.has_premine && genesisData ? `<div id="investors">
-            ${renderInvestorDetailsSection(genesisData)}
-            ${renderGenesisSection(genesisData)}
-            ${renderDueDiligenceFindings(projectData, genesisData)}
+            ${renderInvestorDetailsSection(genesisData, borderColor)}
+            ${renderGenesisSection(genesisData, borderColor)}
+            ${renderDueDiligenceFindings(projectData, genesisData, borderColor)}
         </div>` : ''}
 
-        <div id="analysis">${renderKeyMetricsSummary(projectData, genesisData)}</div>
+        <div id="analysis">${renderKeyMetricsSummary(projectData, genesisData, borderColor)}</div>
         <div id="market">
-            ${renderMarketSection(projectData)}
-            ${renderNotesSection(projectData)}
-            ${renderSourcesSection(projectData)}
+            ${renderMarketSection(projectData, borderColor)}
+            ${renderNotesSection(projectData, borderColor)}
+            ${renderSourcesSection(projectData, borderColor)}
         </div>
         ${renderNavigationActions(projectData.project)}
     `;
@@ -256,17 +257,16 @@ function initSectionNav() {
     });
 }
 
-function renderWarningBanner(data, preminePercent) {
+function renderWarningBanner(data, preminePercent, borderColor) {
     if (preminePercent > 0) {
         const hasParity = hasMinersAchievedParity(data, genesisData);
-        const bannerClass = hasParity ? 'warning-banner parity' : 'warning-banner';
 
         // Determine allocation type
         const hasEmission = genesisData && genesisData.has_emission_allocation;
         const allocationType = hasEmission ? 'emission allocation' : 'premine allocation';
 
         return `
-            <div class="${bannerClass}">
+            <div class="warning-banner-inline" style="border-color: ${borderColor};">
                 ${createIcon('alert-triangle', { size: '18', className: 'inline-icon' })} <strong>WARNING:</strong> ${formatPercent(preminePercent, 1)} ${allocationType}
                 ${genesisData ? calculateParityWarning(data, genesisData, hasEmission) : ''}
             </div>
@@ -275,7 +275,7 @@ function renderWarningBanner(data, preminePercent) {
 
     if (data.launch_type === 'fair_with_suspicion') {
         return `
-            <div class="warning-banner suspicious">
+            <div class="warning-banner-inline" style="border-color: #F59E0B;">
                 ${createIcon('alert-triangle', { size: '18', className: 'inline-icon' })} <strong>CAUTION:</strong> Suspected insider mining activity
             </div>
         `;
@@ -559,7 +559,7 @@ function renderCurrentSupplyPieChart(projectData, genesisData) {
     `;
 }
 
-function renderSupplySection(data) {
+function renderSupplySection(data, borderColor = 'var(--border)') {
     const supply = data.supply;
     const currentSupplyPct = supply && supply.current_supply && supply.max_supply
         ? (supply.current_supply / supply.max_supply) * 100
@@ -567,7 +567,7 @@ function renderSupplySection(data) {
     const minedPct = calculateMinedPercent(data, genesisData);
 
     return `
-        <div class="section">
+        <div class="section" style="border-color: ${borderColor};">
             <div class="section-header">
                 <h2 class="section-title">${createIcon('bar-chart-2', { size: '24', className: 'inline-icon' })} Supply Metrics</h2>
             </div>
@@ -624,7 +624,7 @@ function renderSupplySection(data) {
     `;
 }
 
-function renderEmissionSection(data) {
+function renderEmissionSection(data, borderColor = 'var(--border)') {
     const emission = data.emission;
     const hasHalvings = emission.halving_schedule && emission.halving_schedule.length > 0;
 
@@ -647,7 +647,7 @@ function renderEmissionSection(data) {
     }
 
     return `
-        <div class="section">
+        <div class="section" style="border-color: ${borderColor};">
             <div class="section-header">
                 <h2 class="section-title">${createIcon('clock', { size: '24', className: 'inline-icon' })} Emission Schedule</h2>
             </div>
@@ -1110,9 +1110,9 @@ function renderDecentralization(decentr) {
     `;
 }
 
-function renderGenesisSection(genesis) {
+function renderGenesisSection(genesis, borderColor = 'var(--border)') {
     return `
-        <div class="section">
+        <div class="section" style="border-color: ${borderColor};">
             <div class="section-header">
                 <h2 class="section-title">${createIcon('target', { size: '24', className: 'inline-icon' })} Genesis Allocation</h2>
                 <span class="section-subtitle">${formatPercent(genesis.total_genesis_allocation_pct, 1)} premined</span>
@@ -1230,13 +1230,13 @@ function renderVestingWaterfall(waterfall) {
     `;
 }
 
-function renderMarketSection(data) {
+function renderMarketSection(data, borderColor = 'var(--border)') {
     const market = data.market_data;
 
     // Check if market data exists
     if (!market) {
         return `
-            <div class="section">
+            <div class="section" style="border-color: ${borderColor};">
                 <div class="section-header">
                     <h2 class="section-title">${createIcon('dollar-sign', { size: '24', className: 'inline-icon' })} Market Data</h2>
                 </div>
@@ -1246,7 +1246,7 @@ function renderMarketSection(data) {
     }
 
     return `
-        <div class="section">
+        <div class="section" style="border-color: ${borderColor};">
             <div class="section-header">
                 <h2 class="section-title">${createIcon('dollar-sign', { size: '24', className: 'inline-icon' })} Market Data</h2>
             </div>
@@ -1276,13 +1276,13 @@ function renderMarketSection(data) {
     `;
 }
 
-function renderNotesSection(data) {
+function renderNotesSection(data, borderColor = 'var(--border)') {
     if (!data.notes || data.notes.length === 0) return '';
     
     const notes = data.notes.map(note => `<li>${note}</li>`).join('');
     
     return `
-        <div class="section">
+        <div class="section" style="border-color: ${borderColor};">
             <div class="section-header">
                 <h2 class="section-title">${createIcon('file-text', { size: '24', className: 'inline-icon' })} Notes & Context</h2>
             </div>
@@ -1293,7 +1293,7 @@ function renderNotesSection(data) {
     `;
 }
 
-function renderSourcesSection(data) {
+function renderSourcesSection(data, borderColor = 'var(--border)') {
     const sources = data.data_sources;
     if (!sources) return '';
 
@@ -1339,7 +1339,7 @@ function renderSourcesSection(data) {
     }
 
     return `
-        <div class="section">
+        <div class="section" style="border-color: ${borderColor};">
             <div class="section-header">
                 <h2 class="section-title">${createIcon('link', { size: '24', className: 'inline-icon' })} Data Sources & Verification</h2>
             </div>
@@ -1381,11 +1381,11 @@ function renderSourcesSection(data) {
 // NEW SECTIONS - Distribution & Analysis
 // ========================================
 
-function renderInvestorDetailsSection(genesis) {
+function renderInvestorDetailsSection(genesis, borderColor = 'var(--border)') {
     if (!genesis) return '';
 
     return `
-        <div class="section">
+        <div class="section" style="border-color: ${borderColor};">
             <div class="section-header">
                 <h2 class="section-title">${createIcon('briefcase', { size: '24', className: 'inline-icon' })} Investor & Insider Details</h2>
             </div>
@@ -1898,7 +1898,7 @@ function renderTransparencyAssessment(genesis) {
     `;
 }
 
-function renderDueDiligenceFindings(data, genesis) {
+function renderDueDiligenceFindings(data, genesis, borderColor = 'var(--border)') {
     if (!genesis) return '';
 
     const suspectedMining = genesis.suspected_insider_mining || {};
@@ -1999,7 +1999,7 @@ function renderDueDiligenceFindings(data, genesis) {
     `;
 }
 
-function renderKeyMetricsSummary(data, genesis) {
+function renderKeyMetricsSummary(data, genesis, borderColor = 'var(--border)') {
     const supply = data.supply;
     const market = data.market_data;
 
