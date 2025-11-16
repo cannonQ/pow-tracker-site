@@ -72,7 +72,6 @@ function renderProjectPage() {
             </div>
         </div>
 
-        ${renderDistributionProgressBar(projectData, genesisData)}
         ${renderSupplySection(projectData)}
         ${renderEmissionSection(projectData)}
 
@@ -381,8 +380,7 @@ function renderCurrentSupplyPieChart(projectData, genesisData) {
                     ${slices.map(slice => `
                         <div class="pie-legend-item">
                             <div class="pie-legend-color ${slice.class}"></div>
-                            <span class="pie-legend-label">${slice.label}</span>
-                            <span class="pie-legend-value">${formatPercent(slice.percent, 1)}</span>
+                            <span class="pie-legend-label">${slice.label}: ${formatPercent(slice.percent, 1)} (${formatTokensShort(slice.tokens)})</span>
                         </div>
                     `).join('')}
                 </div>
@@ -1456,7 +1454,17 @@ function renderVestingWaterfallChart(vestingData, projectData) {
 
     // Prepare data for chart (first 60 months or until completion)
     const schedule = vestingData.monthly_schedule.slice(0, 60);
-    const labels = schedule.map(m => 'M' + m.month);
+
+    // Create labels with actual dates in MMM 'YY format
+    const genesisDate = new Date(vestingData.genesis_date);
+    const labels = schedule.map(m => {
+        const date = new Date(genesisDate);
+        date.setMonth(date.getMonth() + m.month);
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthName = monthNames[date.getMonth()];
+        const year = String(date.getFullYear()).slice(-2);
+        return `${monthName} '${year}`;
+    });
 
     // Prepare tier datasets
     const tier1Data = [];
@@ -1522,11 +1530,13 @@ function renderVestingWaterfallChart(vestingData, projectData) {
                         stacked: true,
                         title: {
                             display: true,
-                            text: 'Months from Genesis',
+                            text: 'Unlock Date',
                             color: '#9CA3AF'
                         },
                         ticks: {
-                            color: '#9CA3AF'
+                            color: '#9CA3AF',
+                            maxRotation: 45,
+                            minRotation: 45
                         },
                         grid: {
                             color: 'rgba(255, 255, 255, 0.05)'
@@ -2086,6 +2096,23 @@ function downloadProjectData(projectName) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+function formatTokensShort(tokens) {
+    if (!tokens || tokens === 0) return '0';
+
+    if (tokens >= 1000000) {
+        const millions = tokens / 1000000;
+        // Format with 1 decimal if needed, otherwise no decimals
+        return millions % 1 === 0 ? `${millions}M` : `${millions.toFixed(1)}M`;
+    }
+
+    if (tokens >= 1000) {
+        const thousands = tokens / 1000;
+        return thousands % 1 === 0 ? `${thousands}K` : `${thousands.toFixed(1)}K`;
+    }
+
+    return formatNumber(tokens, 0);
 }
 
 function capitalize(str) {
