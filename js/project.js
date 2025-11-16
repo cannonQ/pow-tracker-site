@@ -50,7 +50,7 @@ async function loadProjectData(projectName) {
     }
 }
 
-function renderSectionNav(sections) {
+function renderSectionNav(sections, projectName) {
     const pills = sections.map(s =>
         `<a href="#${s.id}" class="section-nav-pill" data-section="${s.id}">${s.label}</a>`
     ).join('');
@@ -68,6 +68,10 @@ function renderSectionNav(sections) {
             <a href="../index.html" class="back-link">
                 ${createIcon('arrow-left', { size: '16', className: 'inline-icon' })}
                 Back to All Projects
+            </a>
+            <div class="section-nav-pills-divider"></div>
+            <a href="#hero" class="section-nav-project-name" data-section="hero">
+                ${capitalize(projectName)}
             </a>
             <div class="section-nav-pills-divider"></div>
             ${pills}
@@ -88,6 +92,11 @@ function renderSectionNav(sections) {
                 <a href="../index.html" class="section-nav-option">
                     ${createIcon('arrow-left', { size: '16', className: 'inline-icon' })}
                     Back to All Projects
+                </a>
+                <div class="section-nav-divider"></div>
+                <a href="#hero" class="section-nav-option" data-section="hero">
+                    ${createIcon('home', { size: '16', className: 'inline-icon' })}
+                    ${capitalize(projectName)}
                 </a>
                 <div class="section-nav-divider"></div>
                 ${options}
@@ -111,7 +120,7 @@ function renderProjectPage() {
     ].filter(s => s.condition);
 
     let html = `
-        ${renderSectionNav(sections)}
+        ${renderSectionNav(sections, projectData.project)}
 
         <div class="project-hero" id="hero">
             <div class="project-hero-header">
@@ -164,13 +173,17 @@ function renderProjectPage() {
 
 function initSectionNav() {
     const pills = document.querySelectorAll('.section-nav-pill');
+    const projectNameLink = document.querySelector('.section-nav-project-name');
     const toggle = document.querySelector('.section-nav-toggle');
     const mobile = document.querySelector('.section-nav-mobile');
     const closeBtn = document.querySelector('.section-nav-close');
     const mobileLinks = document.querySelectorAll('.section-nav-option');
 
-    // Handle pill and mobile link clicks for smooth scrolling
-    [...pills, ...mobileLinks].forEach(link => {
+    // Handle pill, project name, and mobile link clicks for smooth scrolling
+    const allNavLinks = [...pills, ...mobileLinks];
+    if (projectNameLink) allNavLinks.push(projectNameLink);
+
+    allNavLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const targetId = link.getAttribute('data-section');

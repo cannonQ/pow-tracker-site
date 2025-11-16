@@ -17,13 +17,17 @@
     z-index: 90;
     background: var(--dark-secondary);
     border-bottom: 1px solid var(--border);
-    padding: 0.75rem 2rem;
-    margin: 0 -2rem;
+    padding: 0.75rem 0;
+    margin-left: -2rem;
+    margin-right: -2rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
     display: flex;
     justify-content: flex-start;
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .section-nav-pills .back-link {
@@ -36,6 +40,7 @@
     text-decoration: none;
     transition: color 0.2s;
     padding: 0.5rem 0;
+    white-space: nowrap;
 }
 
 .section-nav-pills .back-link:hover {
@@ -47,6 +52,24 @@
     height: 24px;
     background: var(--border);
     margin: 0 0.5rem;
+    flex-shrink: 0;
+}
+
+.section-nav-project-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.2s;
+    padding: 0.5rem 0;
+    white-space: nowrap;
+}
+
+.section-nav-project-name:hover {
+    color: var(--primary);
 }
 
 .section-nav-pill {
