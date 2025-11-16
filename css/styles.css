@@ -89,6 +89,20 @@ a:hover {
     border-bottom-color: var(--primary);
 }
 
+.nav-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+    padding: 0.5rem;
+    transition: color 0.2s;
+}
+
+.nav-toggle:hover {
+    color: var(--primary);
+}
+
 /* ==================== HERO ==================== */
 .hero {
     background: linear-gradient(135deg, var(--dark-secondary) 0%, var(--dark) 100%);
@@ -467,10 +481,44 @@ footer p {
 
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 768px) {
-    .nav-links {
-        gap: 1rem;
+    .nav-toggle {
+        display: block;
     }
-    
+
+    .nav-links {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--dark-secondary);
+        border-top: 1px solid var(--border);
+        flex-direction: column;
+        gap: 0;
+        padding: 1rem 0;
+    }
+
+    .nav-links.active {
+        display: flex;
+    }
+
+    .nav-links a {
+        padding: 1rem 1.5rem;
+        border-bottom: none;
+        border-left: 3px solid transparent;
+    }
+
+    .nav-links a:hover,
+    .nav-links a.active {
+        border-left-color: var(--primary);
+        border-bottom-color: transparent;
+        background: var(--hover);
+    }
+
+    .navbar .container {
+        position: relative;
+    }
+
     .hero h2 {
         font-size: 1.8rem;
     }

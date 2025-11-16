@@ -50,13 +50,60 @@ async function loadProjectData(projectName) {
     }
 }
 
+function renderSectionNav(sections) {
+    const pills = sections.map(s =>
+        `<a href="#${s.id}" class="section-nav-pill" data-section="${s.id}">${s.label}</a>`
+    ).join('');
+
+    const options = sections.map(s =>
+        `<a href="#${s.id}" class="section-nav-option" data-section="${s.id}">
+            ${createIcon('chevron-right', { size: '16', className: 'inline-icon' })}
+            ${s.label}
+        </a>`
+    ).join('');
+
+    return `
+        <!-- Desktop: Sticky Pills -->
+        <nav class="section-nav-pills">
+            ${pills}
+        </nav>
+
+        <!-- Mobile: Floating Button -->
+        <button class="section-nav-toggle" aria-label="Jump to section">
+            ${createIcon('list', { size: '20' })}
+        </button>
+        <div class="section-nav-mobile">
+            <div class="section-nav-mobile-header">
+                <span>Jump to Section</span>
+                <button class="section-nav-close" aria-label="Close">
+                    ${createIcon('x', { size: '20' })}
+                </button>
+            </div>
+            <div class="section-nav-mobile-content">
+                ${options}
+            </div>
+        </div>
+    `;
+}
+
 function renderProjectPage() {
     const container = document.getElementById('project-content');
     const badge = getFairnessBadge(projectData, genesisData);
     const preminePercent = getPreminePercent(projectData, genesisData);
 
+    // Build section navigation based on available content
+    const sections = [
+        { id: 'supply', label: 'Supply', condition: true },
+        { id: 'emission', label: 'Emission', condition: true },
+        { id: 'investors', label: 'Investors', condition: projectData.has_premine && genesisData },
+        { id: 'analysis', label: 'Analysis', condition: true },
+        { id: 'market', label: 'Market', condition: true }
+    ].filter(s => s.condition);
+
     let html = `
-        <div class="project-hero">
+        ${renderSectionNav(sections)}
+
+        <div class="project-hero" id="hero">
             <div class="project-hero-header">
                 <div class="project-hero-title">
                     <h1>${capitalize(projectData.project)}</h1>
@@ -72,19 +119,23 @@ function renderProjectPage() {
             </div>
         </div>
 
-        ${renderSupplySection(projectData)}
-        ${renderEmissionSection(projectData)}
+        <div id="supply">${renderSupplySection(projectData)}</div>
+        <div id="emission">${renderEmissionSection(projectData)}</div>
 
         ${/* Mining section commented out per requirements */'' /* ${renderMiningSection(projectData)} */}
 
-        ${projectData.has_premine && genesisData ? renderInvestorDetailsSection(genesisData) : ''}
-        ${projectData.has_premine && genesisData ? renderGenesisSection(genesisData) : ''}
-        ${projectData.has_premine && genesisData ? renderDueDiligenceFindings(projectData, genesisData) : ''}
+        ${projectData.has_premine && genesisData ? `<div id="investors">
+            ${renderInvestorDetailsSection(genesisData)}
+            ${renderGenesisSection(genesisData)}
+            ${renderDueDiligenceFindings(projectData, genesisData)}
+        </div>` : ''}
 
-        ${renderKeyMetricsSummary(projectData, genesisData)}
-        ${renderMarketSection(projectData)}
-        ${renderNotesSection(projectData)}
-        ${renderSourcesSection(projectData)}
+        <div id="analysis">${renderKeyMetricsSummary(projectData, genesisData)}</div>
+        <div id="market">
+            ${renderMarketSection(projectData)}
+            ${renderNotesSection(projectData)}
+            ${renderSourcesSection(projectData)}
+        </div>
         ${renderNavigationActions(projectData.project)}
     `;
 
@@ -95,7 +146,91 @@ function renderProjectPage() {
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
+
+        // Initialize section navigation
+        initSectionNav();
     }, 50);
+}
+
+function initSectionNav() {
+    const pills = document.querySelectorAll('.section-nav-pill');
+    const toggle = document.querySelector('.section-nav-toggle');
+    const mobile = document.querySelector('.section-nav-mobile');
+    const closeBtn = document.querySelector('.section-nav-close');
+    const mobileLinks = document.querySelectorAll('.section-nav-option');
+
+    // Handle pill and mobile link clicks for smooth scrolling
+    [...pills, ...mobileLinks].forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetId = link.getAttribute('data-section');
+            const targetSection = document.getElementById(targetId);
+
+            if (targetSection) {
+                // Close mobile menu if open
+                if (mobile) mobile.classList.remove('active');
+
+                // Smooth scroll to section with offset for sticky nav
+                const navHeight = document.querySelector('.navbar')?.offsetHeight || 0;
+                const pillsHeight = document.querySelector('.section-nav-pills')?.offsetHeight || 0;
+                const offset = navHeight + pillsHeight + 20;
+
+                const elementPosition = targetSection.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+            }
+        });
+    });
+
+    // Mobile menu toggle
+    if (toggle && mobile) {
+        toggle.addEventListener('click', () => {
+            mobile.classList.add('active');
+        });
+    }
+
+    if (closeBtn && mobile) {
+        closeBtn.addEventListener('click', () => {
+            mobile.classList.remove('active');
+        });
+    }
+
+    // Close mobile menu when clicking outside
+    if (mobile) {
+        mobile.addEventListener('click', (e) => {
+            if (e.target === mobile) {
+                mobile.classList.remove('active');
+            }
+        });
+    }
+
+    // Scrollspy: Highlight active section
+    window.addEventListener('scroll', () => {
+        const sections = document.querySelectorAll('[id]');
+        const navHeight = document.querySelector('.navbar')?.offsetHeight || 0;
+        const pillsHeight = document.querySelector('.section-nav-pills')?.offsetHeight || 0;
+        const offset = navHeight + pillsHeight + 100;
+
+        let currentSection = '';
+
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            if (window.pageYOffset >= sectionTop - offset) {
+                currentSection = section.getAttribute('id');
+            }
+        });
+
+        pills.forEach(pill => {
+            pill.classList.remove('active');
+            if (pill.getAttribute('data-section') === currentSection) {
+                pill.classList.add('active');
+            }
+        });
+    });
 }
 
 function renderWarningBanner(data, preminePercent) {
