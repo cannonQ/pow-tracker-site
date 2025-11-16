@@ -135,7 +135,7 @@ function renderProjectPage() {
             </div>
 
             <div class="key-metrics">
-                ${renderKeyMetrics(projectData)}
+                ${renderKeyMetrics(projectData, borderColor)}
             </div>
         </div>
 
@@ -323,7 +323,7 @@ function calculateMinedPercent(projectData, genesisData) {
     return Math.max(0, minedPct);
 }
 
-function renderKeyMetrics(data) {
+function renderKeyMetrics(data, borderColor = 'var(--border)') {
     const supply = data.supply;
     const currentSupplyPct = supply && supply.current_supply && supply.max_supply
         ? (supply.current_supply / supply.max_supply) * 100
@@ -355,7 +355,7 @@ function renderKeyMetrics(data) {
         </div>
         <div class="metric-box">
             <div class="metric-label">% Mined</div>
-            <div class="metric-value highlight">${formatPercent(minedPct, 1)}</div>
+            <div class="metric-value" style="color: ${borderColor};">${formatPercent(minedPct, 1)}</div>
         </div>
         <div class="metric-box">
             <div class="metric-label">Daily Emission</div>
