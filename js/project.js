@@ -338,28 +338,28 @@ function renderKeyMetrics(data, borderColor = 'var(--border)') {
 
     return `
         <div class="metric-box">
-            <div class="metric-label">Current Price</div>
+            <div class="metric-label">FDMC</div>
+            <div class="metric-value">${formatCurrency(data.market_data?.fdmc)}</div>
+        </div>
+        <div class="metric-box">
+            <div class="metric-label">Price</div>
             <div class="metric-value">${formatCurrency(data.market_data?.current_price_usd)}</div>
         </div>
         <div class="metric-box">
-            <div class="metric-label">FDMC</div>
-            <div class="metric-value">${formatCurrency(data.market_data?.fdmc)}</div>
+            <div class="metric-label">Supply Coins</div>
+            <div class="metric-value">${formatNumber(supply?.current_supply, 0)} ${data.ticker}</div>
+        </div>
+        <div class="metric-box">
+            <div class="metric-label">Daily Emissions</div>
+            <div class="metric-value">${formatNumber(data.emission?.daily_emission, 0)}</div>
         </div>
         <div class="metric-box">
             <div class="metric-label">Current Supply %</div>
             <div class="metric-value">${formatPercent(currentSupplyPct, 1)}</div>
         </div>
         <div class="metric-box">
-            <div class="metric-label">Current Supply Coins</div>
-            <div class="metric-value">${formatNumber(supply?.current_supply, 0)} ${data.ticker}</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">% Mined</div>
+            <div class="metric-label">% Supply Mined</div>
             <div class="metric-value" style="color: ${borderColor};">${formatPercent(minedPct, 1)}</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">Daily Emission</div>
-            <div class="metric-value">${formatNumber(data.emission?.daily_emission, 0)}</div>
         </div>
         <div class="metric-box">
             <div class="metric-label">Annual Inflation</div>
