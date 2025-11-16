@@ -623,6 +623,384 @@
     font-weight: 600;
 }
 
+/* ========================================
+   NEW STYLES - Distribution & Analysis
+   ======================================== */
+
+/* Distribution Progress Bar (4-Segment) */
+.distribution-progress-container {
+    margin-top: 1.5rem;
+}
+
+.distribution-bar {
+    display: flex;
+    height: 60px;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.distribution-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: white;
+    transition: all 0.3s;
+    position: relative;
+}
+
+.distribution-segment:hover {
+    opacity: 0.85;
+    cursor: pointer;
+    transform: scaleY(1.05);
+}
+
+.distribution-segment span {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.distribution-segment.premine-unlocked {
+    background: #DC2626;
+}
+
+.distribution-segment.premine-vesting {
+    background: #F97316;
+}
+
+.distribution-segment.mined {
+    background: #10B981;
+}
+
+.distribution-segment.unmined {
+    background: #D1D5DB;
+    color: #6B7280;
+}
+
+.circulating-marker {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #FFFFFF;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+    z-index: 10;
+}
+
+.circulating-marker::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 8px solid #FFFFFF;
+}
+
+.circulating-marker::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 8px solid #FFFFFF;
+}
+
+.distribution-legend .legend-color.premine-unlocked {
+    background: #DC2626;
+}
+
+.distribution-legend .legend-color.premine-vesting {
+    background: #F97316;
+}
+
+.distribution-legend .legend-color.mined {
+    background: #10B981;
+}
+
+.distribution-legend .legend-color.unmined {
+    background: #D1D5DB;
+}
+
+/* Chart Containers */
+.chart-container {
+    position: relative;
+    height: 400px;
+    background: var(--dark-tertiary);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+/* Investor Table */
+.table-container {
+    overflow-x: auto;
+    margin-top: 1rem;
+}
+
+.investor-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--dark-tertiary);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.investor-table thead {
+    background: var(--dark-secondary);
+}
+
+.investor-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text);
+    border-bottom: 2px solid var(--border);
+    font-size: 0.9rem;
+}
+
+.investor-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.investor-table tbody tr:hover {
+    background: var(--hover);
+}
+
+.investor-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Status Badges */
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.status-badge.status-success {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10B981;
+    border: 1px solid #10B981;
+}
+
+.status-badge.status-warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: #F59E0B;
+    border: 1px solid #F59E0B;
+}
+
+.status-badge.status-danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: #EF4444;
+    border: 1px solid #EF4444;
+}
+
+.status-badge.status-unknown {
+    background: rgba(156, 163, 175, 0.2);
+    color: #9CA3AF;
+    border: 1px solid #9CA3AF;
+}
+
+/* Alert Boxes */
+.alert-box {
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    border-left: 4px solid;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.alert-box.alert-critical {
+    background: rgba(220, 38, 38, 0.1);
+    border-color: #DC2626;
+    color: #DC2626;
+}
+
+.alert-box.alert-high {
+    background: rgba(249, 115, 22, 0.1);
+    border-color: #F97316;
+    color: #F97316;
+}
+
+.alert-box.alert-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: #F59E0B;
+    color: #F59E0B;
+}
+
+.alert-box.alert-success {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: #10B981;
+    color: #10B981;
+}
+
+/* Findings Timeline */
+.findings-timeline {
+    margin-top: 1rem;
+}
+
+.timeline-event-finding {
+    display: flex;
+    gap: 1.5rem;
+    padding: 1rem;
+    background: var(--dark-tertiary);
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    border-left: 3px solid var(--primary);
+}
+
+.timeline-event-finding .timeline-date {
+    min-width: 120px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.timeline-event-finding .timeline-description {
+    flex: 1;
+    color: var(--text-secondary);
+}
+
+/* Findings Notes */
+.findings-notes {
+    list-style: none;
+    padding: 0;
+}
+
+.findings-notes li {
+    padding: 0.75rem 1rem;
+    background: var(--dark-tertiary);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    padding-left: 2.5rem;
+    position: relative;
+    color: var(--text-secondary);
+}
+
+.findings-notes li::before {
+    content: '•';
+    position: absolute;
+    left: 1rem;
+    color: var(--primary);
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+/* Metrics Summary List */
+.metrics-summary-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.metric-summary-item {
+    display: flex;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background: var(--dark-tertiary);
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.metric-summary-item:hover {
+    background: var(--hover);
+}
+
+.metric-number {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.metric-content {
+    flex: 1;
+}
+
+.metric-content h4 {
+    margin: 0 0 0.75rem 0;
+    color: var(--text);
+    font-size: 1rem;
+}
+
+.metric-content ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.metric-content li {
+    padding: 0.5rem 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.metric-content li:last-child {
+    border-bottom: none;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.action-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--dark-tertiary);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.action-button:hover {
+    background: var(--hover);
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.action-button:active {
+    transform: translateY(0);
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
     .project-hero-header {
         flex-direction: column;
@@ -691,5 +1069,56 @@
         flex-direction: column;
         align-items: flex-start;
         gap: 0.5rem;
+    }
+
+    /* Chart containers mobile */
+    .chart-container {
+        height: 300px;
+        padding: 1rem;
+    }
+
+    /* Metrics summary mobile */
+    .metric-summary-item {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .metric-number {
+        align-self: flex-start;
+    }
+
+    /* Action buttons mobile */
+    .action-buttons {
+        flex-direction: column;
+    }
+
+    .action-button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Table mobile */
+    .table-container {
+        margin-left: -2rem;
+        margin-right: -2rem;
+    }
+
+    .investor-table {
+        font-size: 0.8rem;
+    }
+
+    .investor-table th,
+    .investor-table td {
+        padding: 0.75rem 0.5rem;
+    }
+
+    /* Timeline findings mobile */
+    .timeline-event-finding {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .timeline-event-finding .timeline-date {
+        min-width: auto;
     }
 }

@@ -54,7 +54,7 @@ function renderProjectPage() {
     const container = document.getElementById('project-content');
     const badge = getFairnessBadge(projectData, genesisData);
     const preminePercent = getPreminePercent(projectData, genesisData);
-    
+
     let html = `
         <div class="project-hero">
             <div class="project-hero-header">
@@ -64,26 +64,39 @@ function renderProjectPage() {
                 </div>
                 <span class="fairness-badge ${badge.class}">${badge.text}</span>
             </div>
-            
+
             ${renderWarningBanner(projectData, preminePercent)}
-            
+
             <div class="key-metrics">
                 ${renderKeyMetrics(projectData)}
             </div>
         </div>
-        
+
+        ${renderDistributionProgressBar(projectData, genesisData)}
         ${renderSupplySection(projectData)}
         ${renderEmissionSection(projectData)}
-        ${renderMiningSection(projectData)}
-        
+
+        ${/* Mining section commented out per requirements */'' /* ${renderMiningSection(projectData)} */}
+
+        ${projectData.has_premine && genesisData ? renderInvestorDetailsSection(genesisData) : ''}
         ${projectData.has_premine && genesisData ? renderGenesisSection(genesisData) : ''}
-        
+        ${projectData.has_premine && genesisData ? renderDueDiligenceFindings(projectData, genesisData) : ''}
+
+        ${renderKeyMetricsSummary(projectData, genesisData)}
         ${renderMarketSection(projectData)}
         ${renderNotesSection(projectData)}
         ${renderSourcesSection(projectData)}
+        ${renderNavigationActions(projectData.project)}
     `;
-    
+
     container.innerHTML = html;
+
+    // Re-initialize Lucide icons for dynamically added content
+    setTimeout(() => {
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }, 50);
 }
 
 function renderWarningBanner(data, preminePercent) {
@@ -477,6 +490,7 @@ function renderEmissionSection(data) {
                 </div>
             </div>
 
+            ${hasHalvings ? renderEmissionTimelineChart(data) : ''}
             ${traditionalHalvings.length > 0 ? renderHalvingSchedule(traditionalHalvings, data.ticker) : ''}
             ${narrativeEvents.length > 0 ? renderEmissionMilestones(narrativeEvents, data.ticker) : ''}
             ${vestingScheduleData ? renderVestingSchedule(vestingScheduleData, data) : ''}
@@ -607,6 +621,7 @@ function renderVestingSchedule(vestingData, projectData) {
 
     return `
         ${summaryHtml}
+        ${renderVestingWaterfallChart(vestingData, projectData)}
         ${timelineHtml}
         ${tierSummaryHtml}
     `;
@@ -1113,22 +1128,964 @@ function renderSourcesSection(data) {
 
     const links = validLinks.map(url => {
         const domain = new URL(url).hostname.replace('www.', '');
-        return `<a href="${url}" target="_blank" class="source-link">${domain}</a>`;
+        return `<a href="${url}" target="_blank" rel="noopener" class="source-link">${domain}</a>`;
     }).join('');
-    
+
+    // Verification status
+    const hasBlockExplorer = (sources.block_explorer || []).length > 0;
+    const hasOfficialDocs = (sources.official_docs || []).length > 0;
+    const hasMarketData = (sources.market_data || []).length > 0;
+
+    // Data confidence based on source availability
+    let confidence = 'Medium';
+    let confidenceClass = 'status-warning';
+
+    const sourceCount = [hasBlockExplorer, hasOfficialDocs, hasMarketData].filter(Boolean).length;
+    if (sourceCount >= 3) {
+        confidence = 'High';
+        confidenceClass = 'status-success';
+    } else if (sourceCount <= 1) {
+        confidence = 'Low';
+        confidenceClass = 'status-danger';
+    }
+
     return `
         <div class="section">
             <div class="section-header">
-                <h2 class="section-title">${createIcon('link', { size: '24', className: 'inline-icon' })} Data Sources</h2>
+                <h2 class="section-title">${createIcon('link', { size: '24', className: 'inline-icon' })} Data Sources & Verification</h2>
             </div>
+
+            <h3 style="margin-bottom: 1rem; color: var(--text);">Primary Sources</h3>
             <div class="source-links">
                 ${links}
             </div>
-            <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
-                All data is community-sourced and verifiable. Last updated: ${formatDate(data.last_updated)}
+
+            <h3 style="margin: 2rem 0 1rem 0; color: var(--text);">Verification Status</h3>
+            <div class="data-grid">
+                <div class="data-item">
+                    <span class="data-label">On-chain Verified</span>
+                    <span class="data-value"><span class="status-badge ${hasBlockExplorer ? 'status-success' : 'status-danger'}">${hasBlockExplorer ? 'Yes' : 'No'}</span></span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Official Documentation</span>
+                    <span class="data-value"><span class="status-badge ${hasOfficialDocs ? 'status-success' : 'status-danger'}">${hasOfficialDocs ? 'Yes' : 'No'}</span></span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Market Data Available</span>
+                    <span class="data-value"><span class="status-badge ${hasMarketData ? 'status-success' : 'status-warning'}">${hasMarketData ? 'Yes' : 'Limited'}</span></span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Data Confidence</span>
+                    <span class="data-value"><span class="status-badge ${confidenceClass}">${confidence}</span></span>
+                </div>
+            </div>
+
+            <p style="margin-top: 1.5rem; color: var(--text-secondary); font-size: 0.9rem;">
+                ${createIcon('info', { size: '16', className: 'inline-icon' })}
+                All data is community-sourced and verifiable through linked sources. Last updated: ${formatDate(data.last_updated)}
             </p>
         </div>
     `;
+}
+
+// ========================================
+// NEW SECTIONS - Distribution & Analysis
+// ========================================
+
+function renderInvestorDetailsSection(genesis) {
+    if (!genesis) return '';
+
+    return `
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">${createIcon('briefcase', { size: '24', className: 'inline-icon' })} Investor & Insider Details</h2>
+            </div>
+
+            ${renderInvestorTable(genesis)}
+            ${renderTransparencyAssessment(genesis)}
+        </div>
+    `;
+}
+
+function renderDistributionProgressBar(data, genesis) {
+    const maxSupply = data.supply.max_supply;
+    const currentSupply = data.supply.current_supply;
+    const emissionRemaining = data.supply.emission_remaining;
+
+    let premineUnlocked = 0;
+    let premineVesting = 0;
+    let minedToDate = 0;
+    let unmined = 0;
+
+    if (data.has_premine && genesis && vestingScheduleData) {
+        // Calculate current month since genesis
+        const genesisDate = new Date(vestingScheduleData.genesis_date);
+        const now = new Date();
+        const monthsSinceGenesis = Math.floor((now - genesisDate) / (1000 * 60 * 60 * 24 * 30.44));
+
+        // Find current vested amount from schedule
+        const currentMonth = vestingScheduleData.monthly_schedule.find(m => m.month === monthsSinceGenesis) ||
+                           vestingScheduleData.monthly_schedule[vestingScheduleData.monthly_schedule.length - 1];
+
+        const totalAllocation = vestingScheduleData.total_genesis_allocation_tokens;
+        premineUnlocked = currentMonth ? currentMonth.total.cumulative_tokens : 0;
+        premineVesting = totalAllocation - premineUnlocked;
+        minedToDate = currentSupply - totalAllocation;
+        unmined = emissionRemaining;
+    } else if (data.has_premine && genesis) {
+        // Fallback if no vesting schedule: assume all premine is unlocked
+        const totalAllocation = (genesis.total_genesis_allocation_pct / 100) * maxSupply;
+        premineUnlocked = totalAllocation;
+        premineVesting = 0;
+        minedToDate = currentSupply - totalAllocation;
+        unmined = emissionRemaining;
+    } else {
+        // Fair launch: all is mined
+        minedToDate = currentSupply;
+        unmined = emissionRemaining;
+    }
+
+    // Calculate percentages of max supply
+    const premineUnlockedPct = (premineUnlocked / maxSupply) * 100;
+    const premineVestingPct = (premineVesting / maxSupply) * 100;
+    const minedPct = (minedToDate / maxSupply) * 100;
+    const unminedPct = (unmined / maxSupply) * 100;
+
+    // Circulating supply boundary (premine unlocked + mined)
+    const circulatingPct = premineUnlockedPct + minedPct;
+
+    return `
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">${createIcon('bar-chart-3', { size: '24', className: 'inline-icon' })} Distribution Progress</h2>
+                <span class="section-subtitle">${formatPercent(circulatingPct, 1)} Circulating</span>
+            </div>
+
+            <div class="distribution-progress-container">
+                <div class="distribution-bar">
+                    ${premineUnlockedPct > 0 ? `
+                        <div class="distribution-segment premine-unlocked" style="width: ${premineUnlockedPct}%">
+                            ${premineUnlockedPct > 5 ? '<span>' + formatPercent(premineUnlockedPct, 1) + '</span>' : ''}
+                        </div>
+                    ` : ''}
+                    ${premineVestingPct > 0 ? `
+                        <div class="distribution-segment premine-vesting" style="width: ${premineVestingPct}%">
+                            ${premineVestingPct > 5 ? '<span>' + formatPercent(premineVestingPct, 1) + '</span>' : ''}
+                        </div>
+                    ` : ''}
+                    ${minedPct > 0 ? `
+                        <div class="distribution-segment mined" style="width: ${minedPct}%">
+                            ${minedPct > 5 ? '<span>' + formatPercent(minedPct, 1) + '</span>' : ''}
+                        </div>
+                    ` : ''}
+                    ${unminedPct > 0 ? `
+                        <div class="distribution-segment unmined" style="width: ${unminedPct}%">
+                            ${unminedPct > 5 ? '<span>' + formatPercent(unminedPct, 1) + '</span>' : ''}
+                        </div>
+                    ` : ''}
+                    ${circulatingPct < 100 ? `
+                        <div class="circulating-marker" style="left: ${circulatingPct}%"></div>
+                    ` : ''}
+                </div>
+
+                <div class="distribution-legend">
+                    ${premineUnlockedPct > 0 ? `
+                        <div class="legend-item">
+                            <div class="legend-color premine-unlocked"></div>
+                            <span class="legend-text">Premine Unlocked (Liquid)</span>
+                            <span class="legend-percent">${formatPercent(premineUnlockedPct, 1)} (${formatNumber(premineUnlocked, 0)})</span>
+                        </div>
+                    ` : ''}
+                    ${premineVestingPct > 0 ? `
+                        <div class="legend-item">
+                            <div class="legend-color premine-vesting"></div>
+                            <span class="legend-text">Premine Vesting (Locked)</span>
+                            <span class="legend-percent">${formatPercent(premineVestingPct, 1)} (${formatNumber(premineVesting, 0)})</span>
+                        </div>
+                    ` : ''}
+                    <div class="legend-item">
+                        <div class="legend-color mined"></div>
+                        <span class="legend-text">Mined to Date</span>
+                        <span class="legend-percent">${formatPercent(minedPct, 1)} (${formatNumber(minedToDate, 0)})</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color unmined"></div>
+                        <span class="legend-text">Unmined (Future Emissions)</span>
+                        <span class="legend-percent">${formatPercent(unminedPct, 1)} (${formatNumber(unmined, 0)})</span>
+                    </div>
+                </div>
+
+                <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                    ${createIcon('info', { size: '16', className: 'inline-icon' })}
+                    Vertical marker shows circulating supply boundary (${formatPercent(circulatingPct, 1)} of max supply).
+                    ${premineVestingPct > 0 ? `${formatNumber(premineVesting, 0)} tokens remain locked in vesting schedules.` : ''}
+                </p>
+            </div>
+        </div>
+    `;
+}
+
+function renderEmissionTimelineChart(data) {
+    if (!data.emission || !data.emission.halving_schedule) return '';
+
+    const chartId = 'emission-timeline-chart-' + Math.random().toString(36).substr(2, 9);
+
+    // Calculate emission over time
+    const launchDate = new Date(data.launch_date);
+    const currentDate = new Date();
+    const yearsFromLaunch = (currentDate - launchDate) / (1000 * 60 * 60 * 24 * 365.25);
+    const maxYears = Math.max(20, Math.ceil(yearsFromLaunch) + 10);
+
+    const labels = [];
+    const emissionData = [];
+
+    // Build timeline data
+    let currentReward = data.emission.halving_schedule[0]?.reward_before || data.emission.current_block_reward;
+    const blockTime = data.emission.block_time_seconds;
+    const blocksPerYear = (365.25 * 24 * 60 * 60) / blockTime;
+
+    const halvings = data.emission.halving_schedule.map(h => ({
+        year: (new Date(h.date) - launchDate) / (1000 * 60 * 60 * 24 * 365.25),
+        reward: h.reward_after,
+        height: h.height
+    }));
+
+    for (let year = 0; year <= maxYears; year++) {
+        labels.push(year);
+
+        // Find if there's a halving at this year
+        const halving = halvings.find(h => Math.abs(h.year - year) < 0.5);
+        if (halving) {
+            currentReward = halving.reward;
+        }
+
+        const annualEmission = currentReward * blocksPerYear;
+        emissionData.push(annualEmission);
+    }
+
+    // Render chart after DOM is ready
+    setTimeout(() => {
+        const canvas = document.getElementById(chartId);
+        if (!canvas) return;
+
+        new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Annual Emission (' + data.ticker + ')',
+                    data: emissionData,
+                    borderColor: '#3B82F6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: {
+                            color: '#E5E7EB'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return formatNumber(context.parsed.y, 0) + ' ' + data.ticker;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Years from Launch',
+                            color: '#9CA3AF'
+                        },
+                        ticks: {
+                            color: '#9CA3AF'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Annual Emission',
+                            color: '#9CA3AF'
+                        },
+                        ticks: {
+                            color: '#9CA3AF',
+                            callback: function(value) {
+                                return formatNumber(value, 0);
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    }
+                }
+            }
+        });
+    }, 100);
+
+    return `
+        <div style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 1rem; color: var(--text);">Emission Timeline</h3>
+            <div class="chart-container">
+                <canvas id="${chartId}"></canvas>
+            </div>
+            <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                ${createIcon('trending-down', { size: '16', className: 'inline-icon' })}
+                Chart shows annual emission decay over time. Drops represent halving events.
+            </p>
+        </div>
+    `;
+}
+
+function renderVestingWaterfallChart(vestingData, projectData) {
+    if (!vestingData || !vestingData.monthly_schedule) return '';
+
+    const chartId = 'vesting-waterfall-chart-' + Math.random().toString(36).substr(2, 9);
+
+    // Prepare data for chart (first 60 months or until completion)
+    const schedule = vestingData.monthly_schedule.slice(0, 60);
+    const labels = schedule.map(m => 'M' + m.month);
+
+    // Prepare tier datasets
+    const tier1Data = [];
+    const tier2Data = [];
+    const tier3Data = [];
+
+    schedule.forEach(monthData => {
+        const tier1 = monthData.tier_aggregates?.tier_1_profit_seeking?.unlock_tokens || 0;
+        const tier2 = monthData.tier_aggregates?.tier_2_entity_controlled?.unlock_tokens || 0;
+        const tier3 = monthData.tier_aggregates?.tier_3_community?.unlock_tokens || 0;
+
+        tier1Data.push(tier1);
+        tier2Data.push(tier2);
+        tier3Data.push(tier3);
+    });
+
+    setTimeout(() => {
+        const canvas = document.getElementById(chartId);
+        if (!canvas) return;
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Tier 1: Profit-Seeking',
+                        data: tier1Data,
+                        backgroundColor: '#E74C3C'
+                    },
+                    {
+                        label: 'Tier 2: Entity Controlled',
+                        data: tier2Data,
+                        backgroundColor: '#F39C12'
+                    },
+                    {
+                        label: 'Tier 3: Community',
+                        data: tier3Data,
+                        backgroundColor: '#3498DB'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        labels: {
+                            color: '#E5E7EB'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + formatNumber(context.parsed.y, 0) + ' ' + projectData.ticker;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        title: {
+                            display: true,
+                            text: 'Months from Genesis',
+                            color: '#9CA3AF'
+                        },
+                        ticks: {
+                            color: '#9CA3AF'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    },
+                    y: {
+                        stacked: true,
+                        title: {
+                            display: true,
+                            text: 'Tokens Unlocking',
+                            color: '#9CA3AF'
+                        },
+                        ticks: {
+                            color: '#9CA3AF',
+                            callback: function(value) {
+                                return formatNumber(value, 0);
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    }
+                }
+            }
+        });
+    }, 100);
+
+    return `
+        <div style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 1rem; color: var(--text);">Vesting Waterfall</h3>
+            <div class="chart-container">
+                <canvas id="${chartId}"></canvas>
+            </div>
+            <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                ${createIcon('bar-chart-2', { size: '16', className: 'inline-icon' })}
+                Monthly unlock schedule by tier. Stacked bars show total tokens vesting each month.
+            </p>
+        </div>
+    `;
+}
+
+function renderInvestorTable(genesis) {
+    const tier1 = genesis.allocation_tiers.tier_1_profit_seeking;
+    if (!tier1 || !tier1.buckets) return '';
+
+    const rows = tier1.buckets.map(bucket => {
+        const knownInvestors = bucket.investors?.known || bucket.recipients?.known || [];
+        const unknownCount = bucket.investors?.unknown_count || bucket.recipients?.unknown_count || 0;
+
+        const investorNames = knownInvestors.length > 0
+            ? knownInvestors.map(inv => inv.name).join(', ')
+            : unknownCount > 0
+                ? `${unknownCount} undisclosed`
+                : 'Not disclosed';
+
+        const totalRaised = bucket.investors?.total_raised_usd || 0;
+
+        return `
+            <tr>
+                <td>${bucket.name}</td>
+                <td>${formatNumber(bucket.absolute_tokens, 0)}</td>
+                <td>${formatPercent(bucket.pct, 1)}</td>
+                <td>${formatCurrency(bucket.cost_per_token_usd, 2)}</td>
+                <td>${investorNames}</td>
+                <td>${bucket.vesting_months}mo linear${bucket.cliff_months > 0 ? ', ' + bucket.cliff_months + 'mo cliff' : ''}${bucket.tge_unlock_pct > 0 ? ', ' + formatPercent(bucket.tge_unlock_pct) + ' TGE' : ''}</td>
+            </tr>
+        `;
+    }).join('');
+
+    return `
+        <div style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 1rem; color: var(--text);">${createIcon('users', { size: '20', className: 'inline-icon' })} Known Investors</h3>
+            <div class="table-container">
+                <table class="investor-table">
+                    <thead>
+                        <tr>
+                            <th>Round</th>
+                            <th>Amount</th>
+                            <th>% of Supply</th>
+                            <th>Cost/Token</th>
+                            <th>Known Investors</th>
+                            <th>Vesting</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function renderTransparencyAssessment(genesis) {
+    if (!genesis) return '';
+
+    const tier1 = genesis.allocation_tiers.tier_1_profit_seeking;
+    if (!tier1 || !tier1.buckets) return '';
+
+    let knownInvestorsCount = 0;
+    let totalInvestorsCount = 0;
+    let knownAllocations = 0;
+    let totalAllocations = tier1.buckets.length;
+
+    tier1.buckets.forEach(bucket => {
+        const known = bucket.investors?.known || bucket.recipients?.known || [];
+        const unknownCount = bucket.investors?.unknown_count || bucket.recipients?.unknown_count;
+
+        knownInvestorsCount += known.length;
+
+        if (typeof unknownCount === 'number') {
+            totalInvestorsCount += known.length + unknownCount;
+        } else if (known.length > 0) {
+            knownAllocations++;
+        }
+    });
+
+    const knownPct = totalInvestorsCount > 0 ? (knownInvestorsCount / totalInvestorsCount) * 100 : 0;
+    const disclosedPct = totalAllocations > 0 ? (knownAllocations / totalAllocations) * 100 : 0;
+
+    // Determine vesting contract status from notes
+    const transparencyNotes = genesis.transparency_notes || [];
+    let vestingStatus = 'Unknown';
+    let vestingClass = 'status-unknown';
+
+    if (transparencyNotes.some(note => note.toLowerCase().includes('on-chain'))) {
+        vestingStatus = 'On-chain';
+        vestingClass = 'status-success';
+    } else if (transparencyNotes.some(note => note.toLowerCase().includes('off-chain'))) {
+        vestingStatus = 'Off-chain';
+        vestingClass = 'status-warning';
+    }
+
+    // Data confidence
+    let confidence = 'Medium';
+    let confidenceClass = 'status-warning';
+
+    if (knownPct > 70 && disclosedPct > 70) {
+        confidence = 'High';
+        confidenceClass = 'status-success';
+    } else if (knownPct < 30 || disclosedPct < 30) {
+        confidence = 'Low';
+        confidenceClass = 'status-danger';
+    }
+
+    return `
+        <div style="margin-top: 2rem;">
+            <h3 style="margin-bottom: 1rem; color: var(--text);">${createIcon('shield-check', { size: '20', className: 'inline-icon' })} Transparency Assessment</h3>
+            <div class="data-grid">
+                <div class="data-item">
+                    <span class="data-label">Known Investors</span>
+                    <span class="data-value">${knownInvestorsCount} out of ${totalInvestorsCount > 0 ? totalInvestorsCount : '?'} ${totalInvestorsCount > 0 ? '(' + formatPercent(knownPct, 0) + ')' : ''}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Disclosed Allocations</span>
+                    <span class="data-value">${knownAllocations} out of ${totalAllocations} (${formatPercent(disclosedPct, 0)})</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Vesting Contracts</span>
+                    <span class="data-value"><span class="status-badge ${vestingClass}">${vestingStatus}</span></span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Data Confidence</span>
+                    <span class="data-value"><span class="status-badge ${confidenceClass}">${confidence}</span></span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderDueDiligenceFindings(data, genesis) {
+    if (!genesis) return '';
+
+    const suspectedMining = genesis.suspected_insider_mining || {};
+    const transparencyNotes = genesis.transparency_notes || [];
+    const redFlags = genesis.red_flags || {};
+
+    const criticalIssues = redFlags.critical_issues || [];
+    const warnings = redFlags.warnings || [];
+    const suspiciousTimeline = redFlags.suspicious_timeline || suspectedMining.evidence || [];
+
+    // Build issues list
+    let issuesHtml = '';
+
+    // Critical issues
+    criticalIssues.forEach(issue => {
+        issuesHtml += `
+            <div class="alert-box alert-critical">
+                ${createIcon('alert-octagon', { size: '20', className: 'inline-icon' })}
+                <strong>CRITICAL:</strong> ${issue.title || issue.description}
+            </div>
+        `;
+    });
+
+    // Warnings
+    warnings.forEach(issue => {
+        issuesHtml += `
+            <div class="alert-box alert-warning">
+                ${createIcon('alert-triangle', { size: '20', className: 'inline-icon' })}
+                <strong>WARNING:</strong> ${issue.title || issue.description}
+            </div>
+        `;
+    });
+
+    // Suspected insider mining
+    if (suspectedMining.enabled) {
+        issuesHtml += `
+            <div class="alert-box alert-high">
+                ${createIcon('flag', { size: '20', className: 'inline-icon' })}
+                <strong>HIGH:</strong> Suspected insider mining activity (${formatPercent(suspectedMining.estimated_pct_of_supply || 0, 1)} of supply)
+            </div>
+        `;
+    }
+
+    // Timeline
+    let timelineHtml = '';
+    if (suspiciousTimeline.length > 0) {
+        timelineHtml = `
+            <h3 style="margin: 2rem 0 1rem 0; color: var(--text);">${createIcon('clock', { size: '20', className: 'inline-icon' })} Timeline of Events</h3>
+            <div class="findings-timeline">
+                ${suspiciousTimeline.map(event => `
+                    <div class="timeline-event-finding">
+                        <div class="timeline-date">${formatDate(event.date)}</div>
+                        <div class="timeline-description">
+                            ${event.event || event.description}
+                            ${event.evidence ? `<div style="margin-top: 0.5rem; font-size: 0.85rem; opacity: 0.7;">Evidence: ${event.evidence}</div>` : ''}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    // Transparency notes
+    let notesHtml = '';
+    if (transparencyNotes.length > 0) {
+        notesHtml = `
+            <h3 style="margin: 2rem 0 1rem 0; color: var(--text);">${createIcon('info', { size: '20', className: 'inline-icon' })} Data Quality Notes</h3>
+            <ul class="findings-notes">
+                ${transparencyNotes.map(note => `<li>${note}</li>`).join('')}
+            </ul>
+        `;
+    }
+
+    // If no findings, show positive message
+    if (!issuesHtml && !timelineHtml && !notesHtml) {
+        return `
+            <div class="section">
+                <div class="section-header">
+                    <h2 class="section-title">${createIcon('clipboard-check', { size: '24', className: 'inline-icon' })} Due Diligence Findings</h2>
+                </div>
+                <div class="alert-box alert-success">
+                    ${createIcon('check-circle', { size: '20', className: 'inline-icon' })}
+                    <strong>No major issues identified.</strong> Standard due diligence checks passed.
+                </div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">${createIcon('clipboard-check', { size: '24', className: 'inline-icon' })} Due Diligence Findings</h2>
+            </div>
+            ${issuesHtml}
+            ${timelineHtml}
+            ${notesHtml}
+        </div>
+    `;
+}
+
+function renderKeyMetricsSummary(data, genesis) {
+    const supply = data.supply;
+    const market = data.market_data;
+
+    // Calculate metrics
+
+    // 1. Absolute token holdings by party
+    let foundationTokens = 0;
+    let teamTokens = 0;
+    let investorTokens = 0;
+    let minersTokens = supply.current_supply;
+
+    if (genesis) {
+        const tier2 = genesis.allocation_tiers.tier_2_entity_controlled;
+        const tier1 = genesis.allocation_tiers.tier_1_profit_seeking;
+
+        if (tier2) {
+            foundationTokens = (tier2.total_pct / 100) * supply.max_supply;
+            minersTokens -= foundationTokens;
+        }
+        if (tier1) {
+            const totalTier1Tokens = (tier1.total_pct / 100) * supply.max_supply;
+            tier1.buckets?.forEach(bucket => {
+                if (bucket.name.toLowerCase().includes('team') || bucket.name.toLowerCase().includes('contributor')) {
+                    teamTokens += bucket.absolute_tokens || 0;
+                } else {
+                    investorTokens += bucket.absolute_tokens || 0;
+                }
+            });
+            minersTokens -= totalTier1Tokens;
+        }
+    }
+
+    // 2. Effective control percentage
+    const foundationControlPct = (foundationTokens / supply.current_supply) * 100;
+    const insiderControlPct = ((foundationTokens + teamTokens + investorTokens) / supply.current_supply) * 100;
+
+    // 3. Cumulative emissions
+    const emittedPct = (supply.current_supply / supply.max_supply) * 100;
+    const remainingPct = (supply.emission_remaining / supply.max_supply) * 100;
+
+    // 4. Unlock cliff sizes
+    let largestCliff = { tokens: 0, date: 'N/A' };
+    let nextUnlock = { tokens: 0, date: 'N/A' };
+    let vestingCompletion = 'N/A';
+
+    if (vestingScheduleData) {
+        const now = new Date();
+        const genesisDate = new Date(vestingScheduleData.genesis_date);
+        const monthsSinceGenesis = Math.floor((now - genesisDate) / (1000 * 60 * 60 * 24 * 30.44));
+
+        // Find largest cliff
+        vestingScheduleData.monthly_schedule.forEach(month => {
+            if (month.total.unlock_tokens > largestCliff.tokens) {
+                largestCliff = { tokens: month.total.unlock_tokens, date: month.date };
+            }
+
+            // Find next unlock
+            if (month.month > monthsSinceGenesis && !nextUnlock.date && month.total.unlock_tokens > 0) {
+                nextUnlock = { tokens: month.total.unlock_tokens, date: month.date };
+            }
+        });
+
+        // Vesting completion
+        const lastMonth = vestingScheduleData.monthly_schedule[vestingScheduleData.monthly_schedule.length - 1];
+        vestingCompletion = lastMonth.date;
+    }
+
+    // 5. Presale/ICO total raised
+    let totalRaised = 0;
+    let numRounds = 0;
+    let leadInvestors = [];
+
+    if (genesis && genesis.allocation_tiers.tier_1_profit_seeking) {
+        genesis.allocation_tiers.tier_1_profit_seeking.buckets?.forEach(bucket => {
+            if (bucket.investors?.total_raised_usd) {
+                totalRaised += bucket.investors.total_raised_usd;
+                numRounds++;
+
+                const known = bucket.investors.known || [];
+                known.forEach(inv => {
+                    if (!leadInvestors.includes(inv.name)) {
+                        leadInvestors.push(inv.name);
+                    }
+                });
+            }
+        });
+    }
+
+    const avgEntryPrice = totalRaised > 0 && genesis
+        ? totalRaised / ((genesis.allocation_tiers.tier_1_profit_seeking.total_pct / 100) * supply.max_supply)
+        : 0;
+
+    // 10. Inflation-adjusted ROI
+    let nominalROI = 0;
+    let inflationAdjustedROI = 0;
+
+    if (avgEntryPrice > 0 && market?.current_price_usd) {
+        nominalROI = ((market.current_price_usd - avgEntryPrice) / avgEntryPrice) * 100;
+
+        // Simple inflation adjustment (assuming ~3% annual inflation)
+        const launchDate = new Date(data.launch_date);
+        const yearsElapsed = (new Date() - launchDate) / (1000 * 60 * 60 * 24 * 365.25);
+        const inflationFactor = Math.pow(1.03, yearsElapsed);
+        inflationAdjustedROI = ((market.current_price_usd / inflationFactor - avgEntryPrice) / avgEntryPrice) * 100;
+    }
+
+    return `
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">${createIcon('list-ordered', { size: '24', className: 'inline-icon' })} Key Metrics Summary</h2>
+            </div>
+
+            <div class="metrics-summary-list">
+                <div class="metric-summary-item">
+                    <div class="metric-number">1</div>
+                    <div class="metric-content">
+                        <h4>Absolute token holdings by party</h4>
+                        <ul>
+                            <li>Foundation/Treasury: ${formatNumber(foundationTokens, 0)} ${data.ticker} (${formatCurrency(foundationTokens * (market?.current_price_usd || 0))} value)</li>
+                            <li>Team/Contributors: ${formatNumber(teamTokens, 0)} ${data.ticker} (${formatCurrency(teamTokens * (market?.current_price_usd || 0))} value)</li>
+                            <li>Investors: ${formatNumber(investorTokens, 0)} ${data.ticker} (${formatCurrency(investorTokens * (market?.current_price_usd || 0))} value)</li>
+                            <li>Miners/Community: ${formatNumber(minersTokens, 0)} ${data.ticker} (${formatCurrency(minersTokens * (market?.current_price_usd || 0))} value)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="metric-summary-item">
+                    <div class="metric-number">2</div>
+                    <div class="metric-content">
+                        <h4>Effective control percentage</h4>
+                        <ul>
+                            <li>Foundation direct: ${formatPercent(foundationControlPct, 1)} of circulating</li>
+                            <li>Combined insider control: ${formatPercent(insiderControlPct, 1)} of circulating</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="metric-summary-item">
+                    <div class="metric-number">3</div>
+                    <div class="metric-content">
+                        <h4>Cumulative emissions vs projected</h4>
+                        <ul>
+                            <li>Emitted to date: ${formatNumber(supply.current_supply, 0)} tokens (${formatPercent(emittedPct, 1)} of max supply)</li>
+                            <li>Remaining emissions: ${formatNumber(supply.emission_remaining, 0)} tokens (${formatPercent(remainingPct, 1)} of max supply)</li>
+                            <li>Emission progress: ${formatPercent(emittedPct, 1)} complete</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="metric-summary-item">
+                    <div class="metric-number">4</div>
+                    <div class="metric-content">
+                        <h4>Unlock cliff sizes and dates</h4>
+                        <ul>
+                            <li>Largest cliff: ${formatNumber(largestCliff.tokens, 0)} tokens on ${formatDate(largestCliff.date)}</li>
+                            <li>Next major unlock: ${formatNumber(nextUnlock.tokens, 0)} tokens on ${formatDate(nextUnlock.date)}</li>
+                            <li>Vesting completion: ${formatDate(vestingCompletion)} (all allocations fully vested)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="metric-summary-item">
+                    <div class="metric-number">5</div>
+                    <div class="metric-content">
+                        <h4>Presale/ICO total raised</h4>
+                        <ul>
+                            <li>Total USD raised: ${formatCurrency(totalRaised)}</li>
+                            <li>Number of rounds: ${numRounds}</li>
+                            <li>Average entry price: ${formatCurrency(avgEntryPrice, 2)} per token</li>
+                            <li>Known lead investors: ${leadInvestors.slice(0, 5).join(', ') || 'Not disclosed'}</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="metric-summary-item">
+                    <div class="metric-number">6</div>
+                    <div class="metric-content">
+                        <h4>Current Fully Diluted Market Cap</h4>
+                        <ul>
+                            <li>FDMC: ${formatCurrency(market?.fdmc)} (max supply × current price)</li>
+                            <li>Date of calculation: ${formatDate(data.last_updated)}</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="metric-summary-item">
+                    <div class="metric-number">7</div>
+                    <div class="metric-content">
+                        <h4>Circulating Market Cap</h4>
+                        <ul>
+                            <li>Circ. MC: ${formatCurrency(market?.circulating_mcap)} (circulating × current price)</li>
+                            <li>Rank: ${market?.rank ? '#' + market.rank : 'Not tracked'}</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="metric-summary-item">
+                    <div class="metric-number">8</div>
+                    <div class="metric-content">
+                        <h4>Token velocity</h4>
+                        <ul>
+                            <li>24h volume / circulating MC: ${market?.token_velocity ? formatPercent(market.token_velocity * 100, 2) : 'N/A'}</li>
+                            <li>Interpretation: ${market?.token_velocity > 0.05 ? 'High' : market?.token_velocity > 0.02 ? 'Medium' : 'Low'} liquidity</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="metric-summary-item">
+                    <div class="metric-number">9</div>
+                    <div class="metric-content">
+                        <h4>Concentration ratio</h4>
+                        <ul>
+                            <li>Top tier allocations: ${genesis ? formatPercent(genesis.total_genesis_allocation_pct, 1) : '0%'} of supply</li>
+                            <li>Note: Blockchain-level rich list data unavailable for detailed holder analysis</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="metric-summary-item">
+                    <div class="metric-number">10</div>
+                    <div class="metric-content">
+                        <h4>Inflation-adjusted ROI from presale</h4>
+                        <ul>
+                            <li>Nominal ROI: ${nominalROI > 0 ? '+' : ''}${formatPercent(nominalROI, 1)} (current price / ICO price)</li>
+                            <li>Inflation-adjusted: ${inflationAdjustedROI > 0 ? '+' : ''}${formatPercent(inflationAdjustedROI, 1)} (accounting for ~3% annual USD inflation)</li>
+                            <li>ATH ROI: Data not available</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="metric-summary-item">
+                    <div class="metric-number">11</div>
+                    <div class="metric-content">
+                        <h4>Address obscuration ability</h4>
+                        <ul>
+                            <li>For PoW: Ability to obscure holdings via mixing/multiple addresses</li>
+                            <li>Assessment: ${data.consensus === 'PoW' ? 'Moderate - standard PoW privacy considerations apply' : 'Varies by chain architecture'}</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderNavigationActions(projectName) {
+    return `
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">${createIcon('navigation', { size: '24', className: 'inline-icon' })} Navigation & Actions</h2>
+            </div>
+
+            <div class="action-buttons">
+                <a href="../index.html" class="action-button">
+                    ${createIcon('arrow-left', { size: '18', className: 'inline-icon' })} Back to Projects
+                </a>
+                <button class="action-button" onclick="alert('Comparison feature coming soon!')">
+                    ${createIcon('git-compare', { size: '18', className: 'inline-icon' })} Add to Compare
+                </button>
+                <button class="action-button" onclick="downloadProjectData('${projectName}')">
+                    ${createIcon('download', { size: '18', className: 'inline-icon' })} Download Data
+                </button>
+                <a href="https://github.com/cannonQ/pow-tokenomics-tracker/issues" target="_blank" class="action-button">
+                    ${createIcon('message-circle', { size: '18', className: 'inline-icon' })} Report Issue
+                </a>
+            </div>
+        </div>
+    `;
+}
+
+function downloadProjectData(projectName) {
+    const dataToExport = {
+        project: projectData,
+        genesis: genesisData,
+        vesting_schedule: vestingScheduleData,
+        exported_at: new Date().toISOString()
+    };
+
+    const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectName}-data-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 function capitalize(str) {
