@@ -172,6 +172,12 @@ function renderKeyMetrics(data) {
         : null;
     const minedPct = calculateMinedPercent(data, genesisData);
 
+    // Calculate annual inflation: (Daily Emissions × 365) / Current Supply × 100%
+    const annualEmission = data.emission?.daily_emission ? data.emission.daily_emission * 365 : 0;
+    const annualInflationPct = supply?.current_supply && annualEmission > 0
+        ? (annualEmission / supply.current_supply) * 100
+        : 0;
+
     return `
         <div class="metric-box">
             <div class="metric-label">Current Price</div>
@@ -186,12 +192,20 @@ function renderKeyMetrics(data) {
             <div class="metric-value">${formatPercent(currentSupplyPct, 1)}</div>
         </div>
         <div class="metric-box">
+            <div class="metric-label">Current Supply Coins</div>
+            <div class="metric-value">${formatNumber(supply?.current_supply, 0)} ${data.ticker}</div>
+        </div>
+        <div class="metric-box">
             <div class="metric-label">% Mined</div>
             <div class="metric-value highlight">${formatPercent(minedPct, 1)}</div>
         </div>
         <div class="metric-box">
             <div class="metric-label">Daily Emission</div>
             <div class="metric-value">${formatNumber(data.emission?.daily_emission, 0)}</div>
+        </div>
+        <div class="metric-box">
+            <div class="metric-label">Annual Inflation</div>
+            <div class="metric-value">${formatPercent(annualInflationPct, 2)}</div>
         </div>
     `;
 }
