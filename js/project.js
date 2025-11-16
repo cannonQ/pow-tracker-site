@@ -217,7 +217,7 @@ function renderSupplyAllocation(data, genesis) {
 
     return `
         <div style="margin-top: 2rem;">
-            <h3 style="margin-bottom: 1rem; color: var(--text);">Genesis Allocation Breakdown</h3>
+            <h3 style="margin-bottom: 1rem; color: var(--text);">Overall Allocation Breakdown</h3>
             <div class="allocation-chart">
                 <div class="allocation-bar">
                     ${tier1 > 0 ? `<div class="allocation-segment tier-1" style="width: ${tier1}%">${tier1 > 5 ? formatPercent(tier1, 1) : ''}</div>` : ''}
@@ -384,9 +384,6 @@ function renderCurrentSupplyPieChart(projectData, genesisData) {
                 `).join('')}
             </div>
         </div>
-        <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
-            Current supply distribution showing ${projectData.has_premine ? (genesisData?.has_emission_allocation ? 'emission allocations vs miner rewards' : 'premine allocations vs miner rewards') : 'mined tokens'} out of ${formatNumber(currentSupply, 0)} ${projectData.ticker} total.
-        </p>
     `;
 }
 
@@ -409,7 +406,11 @@ function renderSupplySection(data) {
                 </div>
                 <div class="data-item">
                     <span class="data-label">Current Supply</span>
-                    <span class="data-value">${formatNumber(supply.current_supply, 0)}</span>
+                    <span class="data-value">${formatPercent(currentSupplyPct, 2)}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Current Supply Coins</span>
+                    <span class="data-value">${formatNumber(supply.current_supply, 0)} ${data.ticker}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">Remaining Emission</span>
@@ -455,6 +456,10 @@ function renderEmissionSection(data) {
     const emission = data.emission;
     const hasHalvings = emission.halving_schedule && emission.halving_schedule.length > 0;
 
+    // Calculate annual inflation: (Daily Emissions × 365) / Current Supply × 100%
+    const annualEmission = emission.daily_emission * 365;
+    const annualInflationPct = (annualEmission / data.supply.current_supply) * 100;
+
     // Split events into traditional halvings and narrative milestones
     let traditionalHalvings = [];
     let narrativeEvents = [];
@@ -489,13 +494,13 @@ function renderEmissionSection(data) {
                 </div>
                 <div class="data-item">
                     <span class="data-label">Annual Inflation</span>
-                    <span class="data-value">${formatPercent(emission.annual_inflation_pct, 2)}</span>
+                    <span class="data-value">${formatPercent(annualInflationPct, 2)}</span>
                 </div>
             </div>
 
             ${hasHalvings ? renderEmissionTimelineChart(data) : ''}
             ${traditionalHalvings.length > 0 ? renderHalvingSchedule(traditionalHalvings, data.ticker) : ''}
-            ${narrativeEvents.length > 0 ? renderEmissionMilestones(narrativeEvents, data.ticker) : ''}
+            ${/* Emission Milestones removed per user request */ ''}
             ${vestingScheduleData ? renderVestingSchedule(vestingScheduleData, data) : ''}
         </div>
     `;
@@ -685,11 +690,18 @@ function renderVestingTimeline(vestingData, projectData, currentMonth) {
     ` : '';
 
     return `
-        <div class="vesting-timeline">
-            <h3 style="margin-bottom: 1rem; color: var(--text);">Unlock Timeline</h3>
-            ${pastHtml}
-            ${futureHtml}
-        </div>
+        <details class="vesting-timeline collapsible-section">
+            <summary class="collapsible-header">
+                <h3 style="margin: 0; color: var(--text); display: inline-flex; align-items: center; gap: 0.5rem;">
+                    ${createIcon('chevron-right', { size: '20', className: 'chevron-icon' })}
+                    Unlock Timeline
+                </h3>
+            </summary>
+            <div class="collapsible-content" style="margin-top: 1rem;">
+                ${pastHtml}
+                ${futureHtml}
+            </div>
+        </details>
     `;
 }
 
@@ -756,7 +768,8 @@ function renderVestingTierSummary(vestingData, projectData, currentMonth) {
     // Build tier summary
     if (vestingData.tier_totals.tier_1_profit_seeking) {
         const tier = vestingData.tier_totals.tier_1_profit_seeking;
-        const currentData = schedule.find(m => m.month === currentMonth);
+        // Find the latest month data up to currentMonth, or use last month if we're past all vesting
+        const currentData = schedule.filter(m => m.month <= currentMonth).pop() || lastScheduleMonth;
         const tier1Current = currentData?.tier_aggregates?.tier_1_profit_seeking?.cumulative_tokens || 0;
         const progressPct = (tier1Current / tier.tokens) * 100;
 
@@ -778,7 +791,8 @@ function renderVestingTierSummary(vestingData, projectData, currentMonth) {
 
     if (vestingData.tier_totals.tier_2_entity_controlled) {
         const tier = vestingData.tier_totals.tier_2_entity_controlled;
-        const currentData = schedule.find(m => m.month === currentMonth);
+        // Find the latest month data up to currentMonth, or use last month if we're past all vesting
+        const currentData = schedule.filter(m => m.month <= currentMonth).pop() || lastScheduleMonth;
         const tier2Current = currentData?.tier_aggregates?.tier_2_entity_controlled?.cumulative_tokens || 0;
         const progressPct = (tier2Current / tier.tokens) * 100;
 
