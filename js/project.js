@@ -330,6 +330,11 @@ function renderKeyMetrics(data, borderColor = 'var(--border)') {
         : null;
     const minedPct = calculateMinedPercent(data, genesisData);
 
+    // Calculate market cap: Current Supply × Current Price
+    const marketCap = supply?.current_supply && data.market_data?.current_price_usd
+        ? supply.current_supply * data.market_data.current_price_usd
+        : null;
+
     // Calculate annual inflation: (Daily Emissions × 365) / Current Supply × 100%
     const annualEmission = data.emission?.daily_emission ? data.emission.daily_emission * 365 : 0;
     const annualInflationPct = supply?.current_supply && annualEmission > 0
@@ -338,7 +343,11 @@ function renderKeyMetrics(data, borderColor = 'var(--border)') {
 
     return `
         <div class="metric-box">
-            <div class="metric-label">Current Price</div>
+            <div class="metric-label">MC</div>
+            <div class="metric-value">${formatCurrency(marketCap)}</div>
+        </div>
+        <div class="metric-box">
+            <div class="metric-label">Price</div>
             <div class="metric-value">${formatCurrency(data.market_data?.current_price_usd)}</div>
         </div>
         <div class="metric-box">
@@ -346,19 +355,19 @@ function renderKeyMetrics(data, borderColor = 'var(--border)') {
             <div class="metric-value">${formatCurrency(data.market_data?.fdmc)}</div>
         </div>
         <div class="metric-box">
-            <div class="metric-label">Current Supply %</div>
-            <div class="metric-value">${formatPercent(currentSupplyPct, 1)}</div>
-        </div>
-        <div class="metric-box">
-            <div class="metric-label">Current Supply Coins</div>
+            <div class="metric-label">Supply Coins</div>
             <div class="metric-value">${formatNumber(supply?.current_supply, 0)} ${data.ticker}</div>
         </div>
         <div class="metric-box">
-            <div class="metric-label">% Mined</div>
+            <div class="metric-label">Current %</div>
+            <div class="metric-value">${formatPercent(currentSupplyPct, 1)}</div>
+        </div>
+        <div class="metric-box">
+            <div class="metric-label">% Supply Mined</div>
             <div class="metric-value" style="color: ${borderColor};">${formatPercent(minedPct, 1)}</div>
         </div>
         <div class="metric-box">
-            <div class="metric-label">Daily Emission</div>
+            <div class="metric-label">Daily Emissions</div>
             <div class="metric-value">${formatNumber(data.emission?.daily_emission, 0)}</div>
         </div>
         <div class="metric-box">
