@@ -156,7 +156,7 @@ function renderProjectPage() {
             ${renderNotesSection(projectData, borderColor)}
             ${renderSourcesSection(projectData, borderColor)}
         </div>
-        ${renderNavigationActions(projectData.project)}
+        ${renderNavigationActions(projectData.project, borderColor)}
     `;
 
     container.innerHTML = html;
@@ -1975,7 +1975,7 @@ function renderDueDiligenceFindings(data, genesis, borderColor = 'var(--border)'
     // If no findings, show positive message
     if (!issuesHtml && !timelineHtml && !notesHtml) {
         return `
-            <div class="section">
+            <div class="section" style="border-color: ${borderColor};">
                 <div class="section-header">
                     <h2 class="section-title">${createIcon('clipboard-check', { size: '24', className: 'inline-icon' })} Due Diligence Findings</h2>
                 </div>
@@ -1988,7 +1988,7 @@ function renderDueDiligenceFindings(data, genesis, borderColor = 'var(--border)'
     }
 
     return `
-        <div class="section">
+        <div class="section" style="border-color: ${borderColor};">
             <div class="section-header">
                 <h2 class="section-title">${createIcon('clipboard-check', { size: '24', className: 'inline-icon' })} Due Diligence Findings</h2>
             </div>
@@ -2107,7 +2107,7 @@ function renderKeyMetricsSummary(data, genesis, borderColor = 'var(--border)') {
     }
 
     return `
-        <div class="section">
+        <div class="section" style="border-color: ${borderColor};">
             <div class="section-header">
                 <h2 class="section-title">${createIcon('list-ordered', { size: '24', className: 'inline-icon' })} Key Metrics Summary</h2>
             </div>
@@ -2245,9 +2245,9 @@ function renderKeyMetricsSummary(data, genesis, borderColor = 'var(--border)') {
     `;
 }
 
-function renderNavigationActions(projectName) {
+function renderNavigationActions(projectName, borderColor = 'var(--border)') {
     return `
-        <div class="section">
+        <div class="section" style="border-color: ${borderColor};">
             <div class="section-header">
                 <h2 class="section-title">${createIcon('navigation', { size: '24', className: 'inline-icon' })} Navigation & Actions</h2>
             </div>
