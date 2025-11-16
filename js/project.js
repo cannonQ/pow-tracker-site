@@ -217,7 +217,7 @@ function renderSupplyAllocation(data, genesis) {
 
     return `
         <div style="margin-top: 2rem;">
-            <h3 style="margin-bottom: 1rem; color: var(--text);">Allocation Breakdown</h3>
+            <h3 style="margin-bottom: 1rem; color: var(--text);">Genesis Allocation Breakdown</h3>
             <div class="allocation-chart">
                 <div class="allocation-bar">
                     ${tier1 > 0 ? `<div class="allocation-segment tier-1" style="width: ${tier1}%">${tier1 > 5 ? formatPercent(tier1, 1) : ''}</div>` : ''}
@@ -372,23 +372,21 @@ function renderCurrentSupplyPieChart(projectData, genesisData) {
     const conicGradient = `conic-gradient(${gradientStops.join(', ')})`;
 
     return `
-        <div class="supply-pie-chart-container">
-            <h3 style="margin: 1.5rem 0 1rem 0; color: var(--text);">Current Supply Breakdown</h3>
-            <div class="pie-chart-wrapper">
-                <div class="pie-chart" style="background: ${conicGradient}"></div>
-                <div class="pie-chart-legend">
-                    ${slices.map(slice => `
-                        <div class="pie-legend-item">
-                            <div class="pie-legend-color ${slice.class}"></div>
-                            <span class="pie-legend-label">${slice.label}: ${formatPercent(slice.percent, 1)} (${formatTokensShort(slice.tokens)})</span>
-                        </div>
-                    `).join('')}
-                </div>
+        <h3 style="margin: 1.5rem 0 1rem 0; color: var(--text);">Current Supply Breakdown</h3>
+        <div class="pie-chart-wrapper">
+            <div class="pie-chart" style="background: ${conicGradient}"></div>
+            <div class="pie-chart-legend">
+                ${slices.map(slice => `
+                    <div class="pie-legend-item">
+                        <div class="pie-legend-color ${slice.class}"></div>
+                        <span class="pie-legend-label">${slice.label}: ${formatPercent(slice.percent, 1)} (${formatTokensShort(slice.tokens)})</span>
+                    </div>
+                `).join('')}
             </div>
-            <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
-                Current supply distribution showing ${projectData.has_premine ? (genesisData?.has_emission_allocation ? 'emission allocations vs miner rewards' : 'premine allocations vs miner rewards') : 'mined tokens'} out of ${formatNumber(currentSupply, 0)} ${projectData.ticker} total.
-            </p>
         </div>
+        <p style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+            Current supply distribution showing ${projectData.has_premine ? (genesisData?.has_emission_allocation ? 'emission allocations vs miner rewards' : 'premine allocations vs miner rewards') : 'mined tokens'} out of ${formatNumber(currentSupply, 0)} ${projectData.ticker} total.
+        </p>
     `;
 }
 
@@ -419,27 +417,34 @@ function renderSupplySection(data) {
                 </div>
             </div>
 
-            <div class="supply-percentage-section">
-                <h3 style="margin: 1.5rem 0 1rem 0; color: var(--text);">Supply Progress</h3>
-                <div class="data-grid">
-                    <div class="data-item-detailed">
-                        <div class="data-item-header">
-                            <span class="data-label">Current Supply %</span>
-                            <span class="data-value">${formatPercent(currentSupplyPct, 2)}</span>
+            <div class="supply-progress-and-pie">
+                <div class="supply-progress-left">
+                    <h3 style="margin: 1.5rem 0 1rem 0; color: var(--text);">Supply Progress</h3>
+                    <div class="supply-progress-items">
+                        <div class="data-item-detailed">
+                            <div class="data-item-header">
+                                <span class="data-label">Current Supply %</span>
+                                <span class="data-value">${formatPercent(currentSupplyPct, 2)}</span>
+                            </div>
+                            <div class="data-description">Total circulating supply as % of max supply</div>
                         </div>
-                        <div class="data-description">Total circulating supply as % of max supply</div>
-                    </div>
-                    <div class="data-item-detailed">
-                        <div class="data-item-header">
-                            <span class="data-label">% Mined</span>
-                            <span class="data-value text-primary">${formatPercent(minedPct, 2)}</span>
+                        <div class="data-item-detailed">
+                            <div class="data-item-header">
+                                <span class="data-label">% Mined</span>
+                                <span class="data-value text-primary">${formatPercent(minedPct, 2)}</span>
+                            </div>
+                            <div class="data-description">Miner block rewards only (excludes ${data.has_premine ? (genesisData?.has_emission_allocation ? 'emission allocation' : 'premine') : 'any allocations'})</div>
                         </div>
-                        <div class="data-description">Miner block rewards only (excludes ${data.has_premine ? (genesisData?.has_emission_allocation ? 'emission allocation' : 'premine') : 'any allocations'})</div>
                     </div>
                 </div>
+
+                ${projectData.has_premine && genesisData ? `
+                <div class="supply-progress-right">
+                    ${renderCurrentSupplyPieChart(projectData, genesisData)}
+                </div>
+                ` : ''}
             </div>
 
-            ${projectData.has_premine && genesisData ? renderCurrentSupplyPieChart(projectData, genesisData) : ''}
             ${projectData.has_premine && genesisData ? renderSupplyAllocation(projectData, genesisData) : ''}
             ${projectData.has_premine && genesisData ? renderDecentralizationPath(projectData, genesisData) : ''}
         </div>

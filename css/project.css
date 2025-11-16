@@ -627,6 +627,30 @@
    NEW STYLES - Distribution & Analysis
    ======================================== */
 
+/* Supply Progress and Pie - Two Column Layout */
+.supply-progress-and-pie {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 1.5rem;
+}
+
+.supply-progress-left {
+    display: flex;
+    flex-direction: column;
+}
+
+.supply-progress-items {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.supply-progress-right {
+    display: flex;
+    flex-direction: column;
+}
+
 /* Distribution Progress Bar (4-Segment) */
 .distribution-progress-container {
     margin-top: 1.5rem;
@@ -1021,6 +1045,12 @@
 
     .allocation-legend {
         grid-template-columns: 1fr;
+    }
+
+    /* Supply progress and pie mobile */
+    .supply-progress-and-pie {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
     }
 
     /* Tier row mobile styles */
