@@ -65,6 +65,11 @@ function renderSectionNav(sections) {
     return `
         <!-- Desktop: Sticky Pills -->
         <nav class="section-nav-pills">
+            <a href="../index.html" class="back-link">
+                ${createIcon('arrow-left', { size: '16', className: 'inline-icon' })}
+                Back to All Projects
+            </a>
+            <div class="section-nav-pills-divider"></div>
             ${pills}
         </nav>
 
@@ -80,6 +85,11 @@ function renderSectionNav(sections) {
                 </button>
             </div>
             <div class="section-nav-mobile-content">
+                <a href="../index.html" class="section-nav-option">
+                    ${createIcon('arrow-left', { size: '16', className: 'inline-icon' })}
+                    Back to All Projects
+                </a>
+                <div class="section-nav-divider"></div>
                 ${options}
             </div>
         </div>

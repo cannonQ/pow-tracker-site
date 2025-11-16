@@ -17,12 +17,36 @@
     z-index: 90;
     background: var(--dark-secondary);
     border-bottom: 1px solid var(--border);
-    padding: 0.75rem 0;
+    padding: 0.75rem 2rem;
     margin: 0 -2rem;
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
+    align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
+}
+
+.section-nav-pills .back-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 0.2s;
+    padding: 0.5rem 0;
+}
+
+.section-nav-pills .back-link:hover {
+    color: var(--primary);
+}
+
+.section-nav-pills-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border);
+    margin: 0 0.5rem;
 }
 
 .section-nav-pill {
@@ -154,18 +178,10 @@
     border-bottom: none;
 }
 
-.back-link {
-    margin: 2rem 0 1rem 0;
-}
-
-.back-link a {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    transition: color 0.2s;
-}
-
-.back-link a:hover {
-    color: var(--text);
+.section-nav-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0.5rem 0;
 }
 
 .project-hero {
