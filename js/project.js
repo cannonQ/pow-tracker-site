@@ -992,6 +992,50 @@ function renderVestingTierSummary(vestingData, projectData, currentMonth) {
         });
     }
 
+    if (vestingData.tier_totals.tier_3_community) {
+        const tier = vestingData.tier_totals.tier_3_community;
+        // Find the latest month data up to currentMonth, or use last month if we're past all vesting
+        const currentData = schedule.filter(m => m.month <= currentMonth).pop() || lastScheduleMonth;
+        const tier3Current = currentData?.tier_aggregates?.tier_3_community?.cumulative_tokens || 0;
+        const progressPct = (tier3Current / tier.tokens) * 100;
+
+        const completionMonth = schedule.find(m =>
+            m.tier_aggregates?.tier_3_community?.cumulative_tokens >= tier.tokens * 0.999
+        );
+
+        tiers.push({
+            name: 'Tier 3: Community',
+            tokens: tier.tokens,
+            pct: tier.pct_of_genesis,
+            completionDate: completionMonth ? completionMonth.date : lastScheduleMonth.date,
+            progress: progressPct,
+            complete: progressPct >= 99,
+            colorClass: 'tier-3'
+        });
+    }
+
+    if (vestingData.tier_totals.tier_4_liquidity) {
+        const tier = vestingData.tier_totals.tier_4_liquidity;
+        // Find the latest month data up to currentMonth, or use last month if we're past all vesting
+        const currentData = schedule.filter(m => m.month <= currentMonth).pop() || lastScheduleMonth;
+        const tier4Current = currentData?.tier_aggregates?.tier_4_liquidity?.cumulative_tokens || 0;
+        const progressPct = (tier4Current / tier.tokens) * 100;
+
+        const completionMonth = schedule.find(m =>
+            m.tier_aggregates?.tier_4_liquidity?.cumulative_tokens >= tier.tokens * 0.999
+        );
+
+        tiers.push({
+            name: 'Tier 4: Liquidity',
+            tokens: tier.tokens,
+            pct: tier.pct_of_genesis,
+            completionDate: completionMonth ? completionMonth.date : lastScheduleMonth.date,
+            progress: progressPct,
+            complete: progressPct >= 99,
+            colorClass: 'tier-4'
+        });
+    }
+
     if (tiers.length === 0) return '';
 
     return `

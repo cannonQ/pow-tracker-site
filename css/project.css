@@ -840,6 +840,10 @@
     color: var(--tier-3-color);
 }
 
+.tier-4-text {
+    color: var(--tier-4-color);
+}
+
 .vesting-tier-summary {
     display: flex;
     flex-direction: column;
