@@ -366,7 +366,7 @@ function renderKeyMetrics(data, borderColor = 'var(--border)') {
         </div>
         <div class="metric-box">
             <div class="metric-label">FDMC</div>
-            <div class="metric-value">${formatCurrency(data.market_data?.fdmc)}</div>
+            <div class="metric-value">${data.supply?.max_supply == null ? '<span title="Uncapped supply — FDMC undefined">&#8734;</span>' : formatCurrency(data.market_data?.fdmc)}</div>
         </div>
         <div class="metric-box">
             <div class="metric-label">Supply Coins</div>
@@ -374,11 +374,11 @@ function renderKeyMetrics(data, borderColor = 'var(--border)') {
         </div>
         <div class="metric-box">
             <div class="metric-label">Current %</div>
-            <div class="metric-value">${formatPercent(currentSupplyPct, 1)}</div>
+            <div class="metric-value">${data.supply?.max_supply == null ? '<span title="Uncapped supply">&#8734;</span>' : formatPercent(currentSupplyPct, 1)}</div>
         </div>
         <div class="metric-box">
             <div class="metric-label">% Supply Mined</div>
-            <div class="metric-value" style="color: ${borderColor};">${formatPercent(minedPct, 1)}</div>
+            <div class="metric-value" style="color: ${borderColor};">${data.supply?.max_supply == null ? '<span title="Uncapped supply — % of max is undefined">&#8734;</span>' : formatPercent(minedPct, 1)}</div>
         </div>
         <div class="metric-box">
             <div class="metric-label">Daily Emissions</div>
@@ -594,14 +594,19 @@ function renderSupplySection(data, borderColor = 'var(--border)') {
             <div class="section-header">
                 <h2 class="section-title">${createIcon('bar-chart-2', { size: '24', className: 'inline-icon' })} Supply Metrics</h2>
             </div>
+            ${supply.max_supply == null ? `
+            <div class="supply-uncapped-notice" style="margin-bottom: 12px; padding: 8px 12px; border-left: 3px solid ${borderColor}; background: rgba(255,255,255,0.03); font-size: 13px; color: var(--text-secondary);">
+                <strong>&#8734; Uncapped supply</strong> — this chain has no fixed maximum.
+                ${supply.notes ? ` ${supply.notes}` : ' Tail emission continues indefinitely.'}
+            </div>` : ''}
             <div class="data-grid">
                 <div class="data-item">
                     <span class="data-label">Max Supply</span>
-                    <span class="data-value">${formatNumber(supply.max_supply, 0)}</span>
+                    <span class="data-value">${supply.max_supply == null ? '&#8734; Uncapped' : formatNumber(supply.max_supply, 0)}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">Current Supply</span>
-                    <span class="data-value">${formatPercent(currentSupplyPct, 2)}</span>
+                    <span class="data-value">${supply.max_supply == null ? '&#8734; Uncapped' : formatPercent(currentSupplyPct, 2)}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">Current Supply Coins</span>
@@ -609,7 +614,7 @@ function renderSupplySection(data, borderColor = 'var(--border)') {
                 </div>
                 <div class="data-item">
                     <span class="data-label">Remaining Emission</span>
-                    <span class="data-value">${formatNumber(supply.emission_remaining, 0)}</span>
+                    <span class="data-value">${supply.max_supply == null ? '&#8734; Uncapped' : formatNumber(supply.emission_remaining, 0)}</span>
                 </div>
             </div>
 
@@ -1327,7 +1332,7 @@ function renderMarketSection(data, borderColor = 'var(--border)') {
                 </div>
                 <div class="data-item">
                     <span class="data-label">FDMC</span>
-                    <span class="data-value">${formatCurrency(market.fdmc)}</span>
+                    <span class="data-value">${data.supply?.max_supply == null ? '&#8734; Uncapped' : formatCurrency(market.fdmc)}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">Circulating MCap</span>
