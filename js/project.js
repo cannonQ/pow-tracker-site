@@ -459,20 +459,46 @@ function renderSupplyAllocation(data, genesis) {
 }
 
 function renderDecentralizationPath(data, genesis) {
-    if (!genesis || !genesis.miner_parity_analysis) return '';
+    if (!genesis) return '';
 
-    const parity = genesis.miner_parity_analysis;
-    const genesisTotal = parity.genesis_allocation_total || (genesis.total_genesis_allocation_pct / 100) * data.supply.max_supply;
-    const minedToDate = parity.cumulative_mined_to_date || data.supply.current_supply - genesisTotal;
-    const pctTowardParity = parity.pct_toward_parity || ((minedToDate / genesisTotal) * 100);
-    const dailyEmission = parity.daily_emission_current || data.emission.daily_emission;
+    // Prefer the pre-computed miner_parity_analysis sidecar if it exists;
+    // otherwise derive everything from primary fields (premine.absolute_tokens,
+    // current_supply, emission.daily_emission). The sidecar is optional.
+    const parity = genesis.miner_parity_analysis || {};
 
-    // Find parity date from timeline
+    const genesisTotal = parity.genesis_allocation_total
+        ?? data.premine?.absolute_tokens
+        ?? (data.supply?.max_supply && genesis.total_genesis_allocation_pct
+            ? (genesis.total_genesis_allocation_pct / 100) * data.supply.max_supply
+            : null);
+
+    if (!genesisTotal) return '';
+
+    const minedToDate = parity.cumulative_mined_to_date
+        ?? (data.supply?.current_supply != null ? data.supply.current_supply - genesisTotal : null);
+
+    if (minedToDate == null) return '';
+
+    const pctTowardParity = parity.pct_toward_parity ?? ((minedToDate / genesisTotal) * 100);
+    const dailyEmission = parity.daily_emission_current ?? data.emission?.daily_emission;
+
+    // Find parity date — prefer the sidecar's timeline; otherwise compute it
+    // forward from today using the current daily emission rate.
+    let parityDate = 'TBD';
     const parityEvent = parity.parity_timeline?.find(event =>
         event.event && event.event.includes('PARITY')
     );
-    const parityDate = parityEvent ? parityEvent.date : 'TBD';
-    const daysFromNow = parityEvent?.days_from_oct_2025;
+    if (parityEvent) {
+        parityDate = parityEvent.date;
+    } else if (dailyEmission && minedToDate < genesisTotal) {
+        const tokensRemaining = genesisTotal - minedToDate;
+        const daysRemaining = tokensRemaining / dailyEmission;
+        const projected = new Date();
+        projected.setDate(projected.getDate() + Math.round(daysRemaining));
+        parityDate = projected.toISOString().slice(0, 10);
+    } else if (minedToDate >= genesisTotal) {
+        parityDate = 'Achieved';
+    }
 
     return `
         <div style="margin-top: 2rem;">
@@ -606,7 +632,7 @@ function renderSupplySection(data, borderColor = 'var(--border)') {
                 </div>
                 <div class="data-item">
                     <span class="data-label">Current Supply</span>
-                    <span class="data-value">${supply.max_supply == null ? '&#8734; Uncapped' : formatPercent(currentSupplyPct, 2)}</span>
+                    <span class="data-value">${supply.max_supply == null ? `${formatNumber(supply.current_supply, 0)} ${data.ticker}` : formatPercent(currentSupplyPct, 2)}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">Current Supply Coins</span>
