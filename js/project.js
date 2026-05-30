@@ -312,16 +312,27 @@ function calculateParityWarning(data, genesis, hasEmission = false) {
 }
 
 function calculateMinedPercent(projectData, genesisData) {
-    if (!projectData.supply?.current_supply || !projectData.supply?.max_supply) {
+    if (!projectData.supply?.current_supply) {
         return null;
     }
 
     const currentSupply = projectData.supply.current_supply;
     const maxSupply = projectData.supply.max_supply;
+    const hasAllocation = projectData.has_premine || (genesisData && (genesisData.has_premine || genesisData.has_emission_allocation));
+
+    // Uncapped supply (e.g. tail emission): compute "% mined" relative to current
+    // circulating instead of max supply, using premine.absolute_tokens.
+    if (maxSupply == null) {
+        if (!hasAllocation) return 100;
+        const premineTokens = projectData.premine?.absolute_tokens;
+        if (!premineTokens) return null;
+        const minedTokens = Math.max(0, currentSupply - premineTokens);
+        return (minedTokens / currentSupply) * 100;
+    }
+
     const currentSupplyPct = (currentSupply / maxSupply) * 100;
 
     // For fair launches, % mined equals current supply %
-    const hasAllocation = projectData.has_premine || (genesisData && (genesisData.has_premine || genesisData.has_emission_allocation));
     if (!hasAllocation || !genesisData) {
         return currentSupplyPct;
     }
@@ -532,43 +543,64 @@ function renderCurrentSupplyPieChart(projectData, genesisData) {
     const supply = projectData.supply;
     const maxSupply = supply.max_supply;
     const currentSupply = supply.current_supply;
-
-    // Calculate current supply percentage
-    const currentSupplyPct = (currentSupply / maxSupply) * 100;
+    const hasAllocation = projectData.has_premine || (genesisData && (genesisData.has_premine || genesisData.has_emission_allocation));
 
     let slices = [];
 
-    const hasAllocation = projectData.has_premine || (genesisData && (genesisData.has_premine || genesisData.has_emission_allocation));
-
-    if (!hasAllocation || !genesisData) {
-        // Fair launch: 100% mined
-        slices = [
-            { label: 'Mined (Block Rewards)', percent: currentSupplyPct, class: 'mining', tokens: currentSupply }
-        ];
+    // Uncapped supply: build slices directly from absolute tokens — what's
+    // actually in circulation, not what's possible. Tier shares come from
+    // (tier_pct / total_genesis_pct) × premine_tokens.
+    if (maxSupply == null) {
+        if (!hasAllocation || !genesisData) {
+            slices = [{ label: 'Mined (Block Rewards)', percent: 100, class: 'mining', tokens: currentSupply }];
+        } else {
+            const premineTokens = projectData.premine?.absolute_tokens ?? 0;
+            const totalGenesisPct = genesisData.total_genesis_allocation_pct || 1;
+            const tiers = genesisData.allocation_tiers || {};
+            const tier1Pct = tiers.tier_1_profit_seeking?.total_pct || 0;
+            const tier2Pct = tiers.tier_2_entity_controlled?.total_pct || 0;
+            const tier3Pct = tiers.tier_3_community?.total_pct || 0;
+            const tier4Pct = tiers.tier_4_liquidity?.total_pct || 0;
+            const tier1Tokens = (tier1Pct / totalGenesisPct) * premineTokens;
+            const tier2Tokens = (tier2Pct / totalGenesisPct) * premineTokens;
+            const tier3Tokens = (tier3Pct / totalGenesisPct) * premineTokens;
+            const tier4Tokens = (tier4Pct / totalGenesisPct) * premineTokens;
+            const minedTokens = Math.max(0, currentSupply - premineTokens);
+            const pct = (n) => (n / currentSupply) * 100;
+            slices = [
+                { label: 'Mined (Block Rewards)', percent: pct(minedTokens), class: 'mining', tokens: minedTokens },
+                tier1Pct > 0 ? { label: 'Tier 1: Profit-Seeking', percent: pct(tier1Tokens), class: 'tier-1', tokens: tier1Tokens } : null,
+                tier2Pct > 0 ? { label: 'Tier 2: Entity Controlled', percent: pct(tier2Tokens), class: 'tier-2', tokens: tier2Tokens } : null,
+                tier3Pct > 0 ? { label: 'Tier 3: Community', percent: pct(tier3Tokens), class: 'tier-3', tokens: tier3Tokens } : null,
+                tier4Pct > 0 ? { label: 'Tier 4: Liquidity', percent: pct(tier4Tokens), class: 'tier-4', tokens: tier4Tokens } : null,
+            ].filter(Boolean);
+        }
     } else {
-        // Premine or Emission: Calculate breakdown
-        const tiers = genesisData.allocation_tiers;
-        const tier1Pct = tiers.tier_1_profit_seeking?.total_pct || 0;
-        const tier2Pct = tiers.tier_2_entity_controlled?.total_pct || 0;
-        const tier3Pct = tiers.tier_3_community?.total_pct || 0;
-        const tier4Pct = tiers.tier_4_liquidity?.total_pct || 0;
-        const premineTotalPct = genesisData.total_genesis_allocation_pct || 0;
-        const minedPct = Math.max(0, currentSupplyPct - premineTotalPct);
-
-        // Calculate absolute token amounts
-        const minedTokens = (minedPct / 100) * maxSupply;
-        const tier1Tokens = (tier1Pct / 100) * maxSupply;
-        const tier2Tokens = (tier2Pct / 100) * maxSupply;
-        const tier3Tokens = (tier3Pct / 100) * maxSupply;
-        const tier4Tokens = (tier4Pct / 100) * maxSupply;
-
-        slices = [
-            { label: 'Mined (Block Rewards)', percent: minedPct, class: 'mining', tokens: minedTokens },
-            tier1Pct > 0 ? { label: 'Tier 1: Profit-Seeking', percent: tier1Pct, class: 'tier-1', tokens: tier1Tokens } : null,
-            tier2Pct > 0 ? { label: 'Tier 2: Entity Controlled', percent: tier2Pct, class: 'tier-2', tokens: tier2Tokens } : null,
-            tier3Pct > 0 ? { label: 'Tier 3: Community', percent: tier3Pct, class: 'tier-3', tokens: tier3Tokens } : null,
-            tier4Pct > 0 ? { label: 'Tier 4: Liquidity', percent: tier4Pct, class: 'tier-4', tokens: tier4Tokens } : null,
-        ].filter(Boolean);
+        // Capped supply: original behaviour (% of max, then normalised).
+        const currentSupplyPct = (currentSupply / maxSupply) * 100;
+        if (!hasAllocation || !genesisData) {
+            slices = [{ label: 'Mined (Block Rewards)', percent: currentSupplyPct, class: 'mining', tokens: currentSupply }];
+        } else {
+            const tiers = genesisData.allocation_tiers;
+            const tier1Pct = tiers.tier_1_profit_seeking?.total_pct || 0;
+            const tier2Pct = tiers.tier_2_entity_controlled?.total_pct || 0;
+            const tier3Pct = tiers.tier_3_community?.total_pct || 0;
+            const tier4Pct = tiers.tier_4_liquidity?.total_pct || 0;
+            const premineTotalPct = genesisData.total_genesis_allocation_pct || 0;
+            const minedPct = Math.max(0, currentSupplyPct - premineTotalPct);
+            const minedTokens = (minedPct / 100) * maxSupply;
+            const tier1Tokens = (tier1Pct / 100) * maxSupply;
+            const tier2Tokens = (tier2Pct / 100) * maxSupply;
+            const tier3Tokens = (tier3Pct / 100) * maxSupply;
+            const tier4Tokens = (tier4Pct / 100) * maxSupply;
+            slices = [
+                { label: 'Mined (Block Rewards)', percent: minedPct, class: 'mining', tokens: minedTokens },
+                tier1Pct > 0 ? { label: 'Tier 1: Profit-Seeking', percent: tier1Pct, class: 'tier-1', tokens: tier1Tokens } : null,
+                tier2Pct > 0 ? { label: 'Tier 2: Entity Controlled', percent: tier2Pct, class: 'tier-2', tokens: tier2Tokens } : null,
+                tier3Pct > 0 ? { label: 'Tier 3: Community', percent: tier3Pct, class: 'tier-3', tokens: tier3Tokens } : null,
+                tier4Pct > 0 ? { label: 'Tier 4: Liquidity', percent: tier4Pct, class: 'tier-4', tokens: tier4Tokens } : null,
+            ].filter(Boolean);
+        }
     }
 
     // Normalize percentages to sum to 100% for pie chart display
@@ -648,13 +680,21 @@ function renderSupplySection(data, borderColor = 'var(--border)') {
                 <div class="supply-progress-left">
                     <h3 style="margin: 1.5rem 0 1rem 0; color: var(--text);">Supply Progress</h3>
                     <div class="supply-progress-items">
+                        ${supply.max_supply != null ? `
                         <div class="data-item-detailed">
                             <div class="data-item-header">
                                 <span class="data-label">Current Supply %</span>
                                 <span class="data-value">${formatPercent(currentSupplyPct, 2)}</span>
                             </div>
                             <div class="data-description">Total circulating supply as % of max supply</div>
-                        </div>
+                        </div>` : `
+                        <div class="data-item-detailed">
+                            <div class="data-item-header">
+                                <span class="data-label">Current Circulating</span>
+                                <span class="data-value">${formatNumber(supply.current_supply, 0)} ${data.ticker}</span>
+                            </div>
+                            <div class="data-description">Uncapped supply — % of max is undefined</div>
+                        </div>`}
                         <div class="data-item-detailed">
                             <div class="data-item-header">
                                 <span class="data-label">% Mined</span>
