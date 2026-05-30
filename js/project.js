@@ -28,17 +28,20 @@ async function loadProjectData(projectName) {
         // Normalize the data structure (fixes kaspa and similar data issues)
         projectData = normalizeProjectData(projectData);
 
-        // Fetch genesis data if premine exists
-        if (projectData.has_premine) {
+        // Fetch genesis data if premine exists OR if launch_type is fair_with_suspicion
+        // (fair_with_suspicion projects ship forensic blocks in genesis.json even
+        // though has_premine=false — e.g. Kaspa, Pearl).
+        const needsGenesis = projectData.has_premine || projectData.launch_type === 'fair_with_suspicion';
+        if (needsGenesis) {
             genesisData = await fetchFromGitHub(`${CONFIG.ALLOCATIONS_PATH}/${projectName}/genesis.json`);
 
-            // Try to fetch vesting schedule if available
-            try {
-                vestingScheduleData = await fetchFromGitHub(`${CONFIG.ALLOCATIONS_PATH}/${projectName}/vesting-schedule.json`);
-            } catch (error) {
-                // Vesting schedule is optional, don't fail if not available
-                console.log('No vesting schedule available for this project');
-                vestingScheduleData = null;
+            if (projectData.has_premine) {
+                try {
+                    vestingScheduleData = await fetchFromGitHub(`${CONFIG.ALLOCATIONS_PATH}/${projectName}/vesting-schedule.json`);
+                } catch (error) {
+                    console.log('No vesting schedule available for this project');
+                    vestingScheduleData = null;
+                }
             }
         }
 
@@ -150,7 +153,12 @@ function renderProjectPage() {
             ${renderDueDiligenceFindings(projectData, genesisData, borderColor)}
         </div>` : ''}
 
-        <div id="analysis">${renderKeyMetricsSummary(projectData, genesisData, borderColor)}</div>
+        <div id="analysis">
+            ${renderKeyMetricsSummary(projectData, genesisData, borderColor)}
+            ${!projectData.has_premine && genesisData && projectData.launch_type === 'fair_with_suspicion'
+                ? renderDueDiligenceFindings(projectData, genesisData, borderColor)
+                : ''}
+        </div>
         <div id="market">
             ${renderMarketSection(projectData, borderColor)}
             ${renderNotesSection(projectData, borderColor)}
@@ -1689,20 +1697,23 @@ function renderEmissionTimelineChart(data) {
     const blockTime = data.emission.block_time_seconds;
     const blocksPerYear = (365.25 * 24 * 60 * 60) / blockTime;
 
-    const halvings = data.emission.halving_schedule.map(h => ({
-        year: (new Date(h.date) - launchDate) / (1000 * 60 * 60 * 24 * 365.25),
-        reward: toNumber(h.reward_after),
-        height: h.height
-    }));
+    const halvings = data.emission.halving_schedule
+        .map(h => ({
+            year: (new Date(h.date || h.date_est) - launchDate) / (1000 * 60 * 60 * 24 * 365.25),
+            reward: toNumber(h.reward_after),
+            height: h.height
+        }))
+        .filter(h => Number.isFinite(h.year) && h.reward != null)
+        .sort((a, b) => a.year - b.year);
 
     for (let year = 0; year <= maxYears; year++) {
         labels.push(year);
 
-        // Find if there's a halving at this year
-        const halving = halvings.find(h => Math.abs(h.year - year) < 0.5);
-        if (halving && halving.reward != null) {
-            currentReward = halving.reward;
-        }
+        // Step-function: use the reward from the most recent halving whose
+        // year <= current year. Handles both Bitcoin-style discrete halvings
+        // and smooth-decay coins that ship halving_schedule as waypoints.
+        const applicable = halvings.filter(h => h.year <= year).pop();
+        if (applicable) currentReward = applicable.reward;
 
         const annualEmission = currentReward != null ? currentReward * blocksPerYear : null;
         emissionData.push(annualEmission);
