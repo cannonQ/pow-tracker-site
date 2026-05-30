@@ -2068,6 +2068,14 @@ function renderDueDiligenceFindings(data, genesis, borderColor = 'var(--border)'
     const warnings = redFlags.warnings || [];
     const suspiciousTimeline = redFlags.suspicious_timeline || suspectedMining.evidence || [];
 
+    // red_flags entries may be either objects ({title, description}) or plain
+    // strings — handle both shapes.
+    const issueText = (entry) => {
+        if (typeof entry === 'string') return entry;
+        if (entry && typeof entry === 'object') return entry.title || entry.description || '';
+        return '';
+    };
+
     // Build issues list
     let issuesHtml = '';
 
@@ -2076,7 +2084,7 @@ function renderDueDiligenceFindings(data, genesis, borderColor = 'var(--border)'
         issuesHtml += `
             <div class="alert-box alert-critical">
                 ${createIcon('alert-octagon', { size: '20', className: 'inline-icon' })}
-                <strong>CRITICAL:</strong> ${issue.title || issue.description}
+                <strong>CRITICAL:</strong> ${issueText(issue)}
             </div>
         `;
     });
@@ -2086,7 +2094,7 @@ function renderDueDiligenceFindings(data, genesis, borderColor = 'var(--border)'
         issuesHtml += `
             <div class="alert-box alert-warning">
                 ${createIcon('alert-triangle', { size: '20', className: 'inline-icon' })}
-                <strong>WARNING:</strong> ${issue.title || issue.description}
+                <strong>WARNING:</strong> ${issueText(issue)}
             </div>
         `;
     });
@@ -2101,21 +2109,41 @@ function renderDueDiligenceFindings(data, genesis, borderColor = 'var(--border)'
         `;
     }
 
-    // Timeline
+    // Timeline. Entries may be either objects ({date, event/description,
+    // evidence}) or strings like "2025-07-15: Danube upgrade activated…".
+    // For strings, peel off a leading YYYY-MM-DD: prefix as the date.
+    const parseTimelineEntry = (entry) => {
+        if (typeof entry === 'string') {
+            const m = entry.match(/^(\d{4}-\d{2}-\d{2})\s*[:\-]\s*(.+)$/);
+            if (m) return { date: m[1], description: m[2], evidence: null };
+            return { date: null, description: entry, evidence: null };
+        }
+        if (entry && typeof entry === 'object') {
+            return {
+                date: entry.date || null,
+                description: entry.event || entry.description || '',
+                evidence: entry.evidence || null
+            };
+        }
+        return { date: null, description: '', evidence: null };
+    };
+
     let timelineHtml = '';
     if (suspiciousTimeline.length > 0) {
         timelineHtml = `
             <h3 style="margin: 2rem 0 1rem 0; color: var(--text);">${createIcon('clock', { size: '20', className: 'inline-icon' })} Timeline of Events</h3>
             <div class="findings-timeline">
-                ${suspiciousTimeline.map(event => `
+                ${suspiciousTimeline.map(entry => {
+                    const e = parseTimelineEntry(entry);
+                    return `
                     <div class="timeline-event-finding">
-                        <div class="timeline-date">${formatDate(event.date)}</div>
+                        <div class="timeline-date">${e.date ? formatDate(e.date) : ''}</div>
                         <div class="timeline-description">
-                            ${event.event || event.description}
-                            ${event.evidence ? `<div style="margin-top: 0.5rem; font-size: 0.85rem; opacity: 0.7;">Evidence: ${event.evidence}</div>` : ''}
+                            ${e.description}
+                            ${e.evidence ? `<div style="margin-top: 0.5rem; font-size: 0.85rem; opacity: 0.7;">Evidence: ${e.evidence}</div>` : ''}
                         </div>
                     </div>
-                `).join('')}
+                `;}).join('')}
             </div>
         `;
     }
