@@ -46,7 +46,7 @@ async function loadProjectData(projectName) {
 
     } catch (error) {
         console.error('Error loading project:', error);
-        showError(document.getElementById('project-content'), 'Failed to load project data');
+        showError(document.getElementById('project-content'), `Failed to load project data: ${error.message}`);
     }
 }
 
@@ -285,10 +285,21 @@ function renderWarningBanner(data, preminePercent, borderColor) {
 }
 
 function calculateParityWarning(data, genesis, hasEmission = false) {
-    const dailyEmission = data.emission.daily_emission;
-    const allocatedTokens = (genesis.total_genesis_allocation_pct / 100) * data.supply.max_supply;
+    const dailyEmission = data.emission?.daily_emission;
+    // Prefer absolute_tokens from the genesis allocation; fall back to pct × max_supply
+    // (only meaningful when max_supply is set).
+    const allocatedTokens = data.premine?.absolute_tokens
+        ?? (data.supply?.max_supply
+            ? (genesis.total_genesis_allocation_pct / 100) * data.supply.max_supply
+            : null);
+
+    if (!dailyEmission || !allocatedTokens) {
+        return '';  // Parity is undefined without an emission rate and a fixed allocation
+    }
+
     const daysToDate = daysSinceLaunch(data.launch_date);
-    const minedToDate = dailyEmission * daysToDate;
+    const premineMinedToDate = (data.supply?.current_supply ?? 0) - allocatedTokens;
+    const minedToDate = premineMinedToDate > 0 ? premineMinedToDate : dailyEmission * daysToDate;
 
     if (minedToDate >= allocatedTokens) {
         return ` | ${createIcon('check-circle', { size: '16', className: 'inline-icon' })} Miners achieved parity`;
@@ -336,10 +347,13 @@ function renderKeyMetrics(data, borderColor = 'var(--border)') {
         : null;
 
     // Calculate annual inflation: (Daily Emissions × 365) / Current Supply × 100%
-    const annualEmission = data.emission?.daily_emission ? data.emission.daily_emission * 365 : 0;
-    const annualInflationPct = supply?.current_supply && annualEmission > 0
-        ? (annualEmission / supply.current_supply) * 100
-        : 0;
+    // Prefer the stored annual_inflation_pct if present (handles cases like uncapped
+    // PoLW where daily_emission is computed empirically from supply delta).
+    const annualEmission = data.emission?.daily_emission ? data.emission.daily_emission * 365 : null;
+    const annualInflationPct = data.emission?.annual_inflation_pct
+        ?? (supply?.current_supply && annualEmission
+            ? (annualEmission / supply.current_supply) * 100
+            : null);
 
     return `
         <div class="metric-box">
@@ -638,8 +652,11 @@ function renderEmissionSection(data, borderColor = 'var(--border)') {
     const hasHalvings = emission.halving_schedule && emission.halving_schedule.length > 0;
 
     // Calculate annual inflation: (Daily Emissions × 365) / Current Supply × 100%
-    const annualEmission = emission.daily_emission * 365;
-    const annualInflationPct = (annualEmission / data.supply.current_supply) * 100;
+    const annualEmission = emission.daily_emission ? emission.daily_emission * 365 : null;
+    const annualInflationPct = emission.annual_inflation_pct
+        ?? (annualEmission && data.supply?.current_supply
+            ? (annualEmission / data.supply.current_supply) * 100
+            : null);
 
     // Split events into traditional halvings and narrative milestones
     let traditionalHalvings = [];
@@ -663,7 +680,7 @@ function renderEmissionSection(data, borderColor = 'var(--border)') {
             <div class="data-grid">
                 <div class="data-item">
                     <span class="data-label">Block Reward</span>
-                    <span class="data-value">${emission.current_block_reward} ${data.ticker}</span>
+                    <span class="data-value">${emission.current_block_reward != null ? `${emission.current_block_reward} ${data.ticker}` : 'N/A'}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">Block Time</span>
@@ -1174,7 +1191,7 @@ function renderGenesisSection(genesis, borderColor = 'var(--border)') {
             ${renderAllocationChart(genesis)}
             ${renderDecentralizationPath(projectData, genesis)}
             ${renderInvestorDetails(genesis)}
-            ${genesis.vesting_waterfall ? renderVestingWaterfall(genesis.vesting_waterfall) : ''}
+            ${Array.isArray(genesis.vesting_waterfall) && genesis.vesting_waterfall.length > 0 ? renderVestingWaterfall(genesis.vesting_waterfall) : ''}
         </div>
     `;
 }
