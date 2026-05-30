@@ -151,22 +151,39 @@ function hasMinersAchievedParity(project, genesisData) {
 function calculateCirculatingComposition(project) {
     const supply = project.data.supply;
     const genesis = project.genesis;
+    const hasAllocation = project.data.has_premine || genesis?.has_premine || genesis?.has_emission_allocation;
 
-    if (!supply?.current_supply || !supply?.max_supply) {
-        return {
-            preminePct: 0,
-            minedPct: 100,
-            isEmission: false,
-            totalCirculating: 0,
-            allocationPctTotal: 0
-        };
+    if (!supply?.current_supply) {
+        return { preminePct: 0, minedPct: 100, isEmission: false, totalCirculating: 0, allocationPctTotal: 0 };
+    }
+
+    // Premined project with no max_supply (e.g. uncapped tail emission): compute composition
+    // from absolute tokens since current/max ratio is undefined.
+    if (!supply.max_supply && hasAllocation && genesis) {
+        const premineTokens = project.data.premine?.absolute_tokens
+            ?? (genesis.total_genesis_allocation_pct && supply.current_supply
+                ? null
+                : 0);
+        if (premineTokens && premineTokens > 0 && premineTokens <= supply.current_supply) {
+            const allocOfCirculating = (premineTokens / supply.current_supply) * 100;
+            return {
+                preminePct: allocOfCirculating,
+                minedPct: 100 - allocOfCirculating,
+                isEmission: genesis.has_emission_allocation || false,
+                totalCirculating: null,  // % of max is undefined when uncapped
+                allocationPctTotal: genesis.total_genesis_allocation_pct || 0
+            };
+        }
+    }
+
+    if (!supply.max_supply) {
+        return { preminePct: 0, minedPct: 100, isEmission: false, totalCirculating: 0, allocationPctTotal: 0 };
     }
 
     // Current supply as % of max
     const currentSupplyPct = (supply.current_supply / supply.max_supply) * 100;
 
     // Fair launch: 100% mined
-    const hasAllocation = project.data.has_premine || genesis?.has_premine || genesis?.has_emission_allocation;
     if (!hasAllocation || !genesis) {
         return {
             preminePct: 0,
@@ -273,7 +290,7 @@ function getLaunchBadgeV2(project, genesisData = null) {
 // Fetch JSON from GitHub using API (avoids CSP sandbox issues with raw.githubusercontent.com)
 async function fetchFromGitHub(path) {
     // Use GitHub API instead of raw URLs to avoid CSP sandbox restrictions
-    const apiUrl = `${CONFIG.API_BASE_URL}/${path}`;
+    const apiUrl = `${CONFIG.API_BASE_URL}/${path}?ref=${encodeURIComponent(CONFIG.BRANCH)}`;
 
     try {
         const response = await fetch(apiUrl);
@@ -298,7 +315,7 @@ async function fetchFromGitHub(path) {
 
 // Fetch list of project files from GitHub API
 async function fetchProjectList() {
-    const url = `${CONFIG.API_BASE_URL}/${CONFIG.PROJECTS_PATH}`;
+    const url = `${CONFIG.API_BASE_URL}/${CONFIG.PROJECTS_PATH}?ref=${encodeURIComponent(CONFIG.BRANCH)}`;
     try {
         const response = await fetch(url);
         if (!response.ok) {

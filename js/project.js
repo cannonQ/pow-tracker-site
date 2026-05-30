@@ -46,7 +46,7 @@ async function loadProjectData(projectName) {
 
     } catch (error) {
         console.error('Error loading project:', error);
-        showError(document.getElementById('project-content'), 'Failed to load project data');
+        showError(document.getElementById('project-content'), `Failed to load project data: ${error.message}`);
     }
 }
 
@@ -285,10 +285,21 @@ function renderWarningBanner(data, preminePercent, borderColor) {
 }
 
 function calculateParityWarning(data, genesis, hasEmission = false) {
-    const dailyEmission = data.emission.daily_emission;
-    const allocatedTokens = (genesis.total_genesis_allocation_pct / 100) * data.supply.max_supply;
+    const dailyEmission = data.emission?.daily_emission;
+    // Prefer absolute_tokens from the genesis allocation; fall back to pct × max_supply
+    // (only meaningful when max_supply is set).
+    const allocatedTokens = data.premine?.absolute_tokens
+        ?? (data.supply?.max_supply
+            ? (genesis.total_genesis_allocation_pct / 100) * data.supply.max_supply
+            : null);
+
+    if (!dailyEmission || !allocatedTokens) {
+        return '';  // Parity is undefined without an emission rate and a fixed allocation
+    }
+
     const daysToDate = daysSinceLaunch(data.launch_date);
-    const minedToDate = dailyEmission * daysToDate;
+    const premineMinedToDate = (data.supply?.current_supply ?? 0) - allocatedTokens;
+    const minedToDate = premineMinedToDate > 0 ? premineMinedToDate : dailyEmission * daysToDate;
 
     if (minedToDate >= allocatedTokens) {
         return ` | ${createIcon('check-circle', { size: '16', className: 'inline-icon' })} Miners achieved parity`;
@@ -301,16 +312,27 @@ function calculateParityWarning(data, genesis, hasEmission = false) {
 }
 
 function calculateMinedPercent(projectData, genesisData) {
-    if (!projectData.supply?.current_supply || !projectData.supply?.max_supply) {
+    if (!projectData.supply?.current_supply) {
         return null;
     }
 
     const currentSupply = projectData.supply.current_supply;
     const maxSupply = projectData.supply.max_supply;
+    const hasAllocation = projectData.has_premine || (genesisData && (genesisData.has_premine || genesisData.has_emission_allocation));
+
+    // Uncapped supply (e.g. tail emission): compute "% mined" relative to current
+    // circulating instead of max supply, using premine.absolute_tokens.
+    if (maxSupply == null) {
+        if (!hasAllocation) return 100;
+        const premineTokens = projectData.premine?.absolute_tokens;
+        if (!premineTokens) return null;
+        const minedTokens = Math.max(0, currentSupply - premineTokens);
+        return (minedTokens / currentSupply) * 100;
+    }
+
     const currentSupplyPct = (currentSupply / maxSupply) * 100;
 
     // For fair launches, % mined equals current supply %
-    const hasAllocation = projectData.has_premine || (genesisData && (genesisData.has_premine || genesisData.has_emission_allocation));
     if (!hasAllocation || !genesisData) {
         return currentSupplyPct;
     }
@@ -336,10 +358,13 @@ function renderKeyMetrics(data, borderColor = 'var(--border)') {
         : null;
 
     // Calculate annual inflation: (Daily Emissions × 365) / Current Supply × 100%
-    const annualEmission = data.emission?.daily_emission ? data.emission.daily_emission * 365 : 0;
-    const annualInflationPct = supply?.current_supply && annualEmission > 0
-        ? (annualEmission / supply.current_supply) * 100
-        : 0;
+    // Prefer the stored annual_inflation_pct if present (handles cases like uncapped
+    // PoLW where daily_emission is computed empirically from supply delta).
+    const annualEmission = data.emission?.daily_emission ? data.emission.daily_emission * 365 : null;
+    const annualInflationPct = data.emission?.annual_inflation_pct
+        ?? (supply?.current_supply && annualEmission
+            ? (annualEmission / supply.current_supply) * 100
+            : null);
 
     return `
         <div class="metric-box">
@@ -352,7 +377,7 @@ function renderKeyMetrics(data, borderColor = 'var(--border)') {
         </div>
         <div class="metric-box">
             <div class="metric-label">FDMC</div>
-            <div class="metric-value">${formatCurrency(data.market_data?.fdmc)}</div>
+            <div class="metric-value">${data.supply?.max_supply == null ? '<span title="Uncapped supply — FDMC undefined">&#8734;</span>' : formatCurrency(data.market_data?.fdmc)}</div>
         </div>
         <div class="metric-box">
             <div class="metric-label">Supply Coins</div>
@@ -360,11 +385,11 @@ function renderKeyMetrics(data, borderColor = 'var(--border)') {
         </div>
         <div class="metric-box">
             <div class="metric-label">Current %</div>
-            <div class="metric-value">${formatPercent(currentSupplyPct, 1)}</div>
+            <div class="metric-value">${data.supply?.max_supply == null ? '<span title="Uncapped supply">&#8734;</span>' : formatPercent(currentSupplyPct, 1)}</div>
         </div>
         <div class="metric-box">
             <div class="metric-label">% Supply Mined</div>
-            <div class="metric-value" style="color: ${borderColor};">${formatPercent(minedPct, 1)}</div>
+            <div class="metric-value" style="color: ${borderColor};">${data.supply?.max_supply == null ? '<span title="Uncapped supply — % of max is undefined">&#8734;</span>' : formatPercent(minedPct, 1)}</div>
         </div>
         <div class="metric-box">
             <div class="metric-label">Daily Emissions</div>
@@ -445,20 +470,46 @@ function renderSupplyAllocation(data, genesis) {
 }
 
 function renderDecentralizationPath(data, genesis) {
-    if (!genesis || !genesis.miner_parity_analysis) return '';
+    if (!genesis) return '';
 
-    const parity = genesis.miner_parity_analysis;
-    const genesisTotal = parity.genesis_allocation_total || (genesis.total_genesis_allocation_pct / 100) * data.supply.max_supply;
-    const minedToDate = parity.cumulative_mined_to_date || data.supply.current_supply - genesisTotal;
-    const pctTowardParity = parity.pct_toward_parity || ((minedToDate / genesisTotal) * 100);
-    const dailyEmission = parity.daily_emission_current || data.emission.daily_emission;
+    // Prefer the pre-computed miner_parity_analysis sidecar if it exists;
+    // otherwise derive everything from primary fields (premine.absolute_tokens,
+    // current_supply, emission.daily_emission). The sidecar is optional.
+    const parity = genesis.miner_parity_analysis || {};
 
-    // Find parity date from timeline
+    const genesisTotal = parity.genesis_allocation_total
+        ?? data.premine?.absolute_tokens
+        ?? (data.supply?.max_supply && genesis.total_genesis_allocation_pct
+            ? (genesis.total_genesis_allocation_pct / 100) * data.supply.max_supply
+            : null);
+
+    if (!genesisTotal) return '';
+
+    const minedToDate = parity.cumulative_mined_to_date
+        ?? (data.supply?.current_supply != null ? data.supply.current_supply - genesisTotal : null);
+
+    if (minedToDate == null) return '';
+
+    const pctTowardParity = parity.pct_toward_parity ?? ((minedToDate / genesisTotal) * 100);
+    const dailyEmission = parity.daily_emission_current ?? data.emission?.daily_emission;
+
+    // Find parity date — prefer the sidecar's timeline; otherwise compute it
+    // forward from today using the current daily emission rate.
+    let parityDate = 'TBD';
     const parityEvent = parity.parity_timeline?.find(event =>
         event.event && event.event.includes('PARITY')
     );
-    const parityDate = parityEvent ? parityEvent.date : 'TBD';
-    const daysFromNow = parityEvent?.days_from_oct_2025;
+    if (parityEvent) {
+        parityDate = parityEvent.date;
+    } else if (dailyEmission && minedToDate < genesisTotal) {
+        const tokensRemaining = genesisTotal - minedToDate;
+        const daysRemaining = tokensRemaining / dailyEmission;
+        const projected = new Date();
+        projected.setDate(projected.getDate() + Math.round(daysRemaining));
+        parityDate = projected.toISOString().slice(0, 10);
+    } else if (minedToDate >= genesisTotal) {
+        parityDate = 'Achieved';
+    }
 
     return `
         <div style="margin-top: 2rem;">
@@ -492,43 +543,64 @@ function renderCurrentSupplyPieChart(projectData, genesisData) {
     const supply = projectData.supply;
     const maxSupply = supply.max_supply;
     const currentSupply = supply.current_supply;
-
-    // Calculate current supply percentage
-    const currentSupplyPct = (currentSupply / maxSupply) * 100;
+    const hasAllocation = projectData.has_premine || (genesisData && (genesisData.has_premine || genesisData.has_emission_allocation));
 
     let slices = [];
 
-    const hasAllocation = projectData.has_premine || (genesisData && (genesisData.has_premine || genesisData.has_emission_allocation));
-
-    if (!hasAllocation || !genesisData) {
-        // Fair launch: 100% mined
-        slices = [
-            { label: 'Mined (Block Rewards)', percent: currentSupplyPct, class: 'mining', tokens: currentSupply }
-        ];
+    // Uncapped supply: build slices directly from absolute tokens — what's
+    // actually in circulation, not what's possible. Tier shares come from
+    // (tier_pct / total_genesis_pct) × premine_tokens.
+    if (maxSupply == null) {
+        if (!hasAllocation || !genesisData) {
+            slices = [{ label: 'Mined (Block Rewards)', percent: 100, class: 'mining', tokens: currentSupply }];
+        } else {
+            const premineTokens = projectData.premine?.absolute_tokens ?? 0;
+            const totalGenesisPct = genesisData.total_genesis_allocation_pct || 1;
+            const tiers = genesisData.allocation_tiers || {};
+            const tier1Pct = tiers.tier_1_profit_seeking?.total_pct || 0;
+            const tier2Pct = tiers.tier_2_entity_controlled?.total_pct || 0;
+            const tier3Pct = tiers.tier_3_community?.total_pct || 0;
+            const tier4Pct = tiers.tier_4_liquidity?.total_pct || 0;
+            const tier1Tokens = (tier1Pct / totalGenesisPct) * premineTokens;
+            const tier2Tokens = (tier2Pct / totalGenesisPct) * premineTokens;
+            const tier3Tokens = (tier3Pct / totalGenesisPct) * premineTokens;
+            const tier4Tokens = (tier4Pct / totalGenesisPct) * premineTokens;
+            const minedTokens = Math.max(0, currentSupply - premineTokens);
+            const pct = (n) => (n / currentSupply) * 100;
+            slices = [
+                { label: 'Mined (Block Rewards)', percent: pct(minedTokens), class: 'mining', tokens: minedTokens },
+                tier1Pct > 0 ? { label: 'Tier 1: Profit-Seeking', percent: pct(tier1Tokens), class: 'tier-1', tokens: tier1Tokens } : null,
+                tier2Pct > 0 ? { label: 'Tier 2: Entity Controlled', percent: pct(tier2Tokens), class: 'tier-2', tokens: tier2Tokens } : null,
+                tier3Pct > 0 ? { label: 'Tier 3: Community', percent: pct(tier3Tokens), class: 'tier-3', tokens: tier3Tokens } : null,
+                tier4Pct > 0 ? { label: 'Tier 4: Liquidity', percent: pct(tier4Tokens), class: 'tier-4', tokens: tier4Tokens } : null,
+            ].filter(Boolean);
+        }
     } else {
-        // Premine or Emission: Calculate breakdown
-        const tiers = genesisData.allocation_tiers;
-        const tier1Pct = tiers.tier_1_profit_seeking?.total_pct || 0;
-        const tier2Pct = tiers.tier_2_entity_controlled?.total_pct || 0;
-        const tier3Pct = tiers.tier_3_community?.total_pct || 0;
-        const tier4Pct = tiers.tier_4_liquidity?.total_pct || 0;
-        const premineTotalPct = genesisData.total_genesis_allocation_pct || 0;
-        const minedPct = Math.max(0, currentSupplyPct - premineTotalPct);
-
-        // Calculate absolute token amounts
-        const minedTokens = (minedPct / 100) * maxSupply;
-        const tier1Tokens = (tier1Pct / 100) * maxSupply;
-        const tier2Tokens = (tier2Pct / 100) * maxSupply;
-        const tier3Tokens = (tier3Pct / 100) * maxSupply;
-        const tier4Tokens = (tier4Pct / 100) * maxSupply;
-
-        slices = [
-            { label: 'Mined (Block Rewards)', percent: minedPct, class: 'mining', tokens: minedTokens },
-            tier1Pct > 0 ? { label: 'Tier 1: Profit-Seeking', percent: tier1Pct, class: 'tier-1', tokens: tier1Tokens } : null,
-            tier2Pct > 0 ? { label: 'Tier 2: Entity Controlled', percent: tier2Pct, class: 'tier-2', tokens: tier2Tokens } : null,
-            tier3Pct > 0 ? { label: 'Tier 3: Community', percent: tier3Pct, class: 'tier-3', tokens: tier3Tokens } : null,
-            tier4Pct > 0 ? { label: 'Tier 4: Liquidity', percent: tier4Pct, class: 'tier-4', tokens: tier4Tokens } : null,
-        ].filter(Boolean);
+        // Capped supply: original behaviour (% of max, then normalised).
+        const currentSupplyPct = (currentSupply / maxSupply) * 100;
+        if (!hasAllocation || !genesisData) {
+            slices = [{ label: 'Mined (Block Rewards)', percent: currentSupplyPct, class: 'mining', tokens: currentSupply }];
+        } else {
+            const tiers = genesisData.allocation_tiers;
+            const tier1Pct = tiers.tier_1_profit_seeking?.total_pct || 0;
+            const tier2Pct = tiers.tier_2_entity_controlled?.total_pct || 0;
+            const tier3Pct = tiers.tier_3_community?.total_pct || 0;
+            const tier4Pct = tiers.tier_4_liquidity?.total_pct || 0;
+            const premineTotalPct = genesisData.total_genesis_allocation_pct || 0;
+            const minedPct = Math.max(0, currentSupplyPct - premineTotalPct);
+            const minedTokens = (minedPct / 100) * maxSupply;
+            const tier1Tokens = (tier1Pct / 100) * maxSupply;
+            const tier2Tokens = (tier2Pct / 100) * maxSupply;
+            const tier3Tokens = (tier3Pct / 100) * maxSupply;
+            const tier4Tokens = (tier4Pct / 100) * maxSupply;
+            slices = [
+                { label: 'Mined (Block Rewards)', percent: minedPct, class: 'mining', tokens: minedTokens },
+                tier1Pct > 0 ? { label: 'Tier 1: Profit-Seeking', percent: tier1Pct, class: 'tier-1', tokens: tier1Tokens } : null,
+                tier2Pct > 0 ? { label: 'Tier 2: Entity Controlled', percent: tier2Pct, class: 'tier-2', tokens: tier2Tokens } : null,
+                tier3Pct > 0 ? { label: 'Tier 3: Community', percent: tier3Pct, class: 'tier-3', tokens: tier3Tokens } : null,
+                tier4Pct > 0 ? { label: 'Tier 4: Liquidity', percent: tier4Pct, class: 'tier-4', tokens: tier4Tokens } : null,
+            ].filter(Boolean);
+        }
     }
 
     // Normalize percentages to sum to 100% for pie chart display
@@ -580,14 +652,19 @@ function renderSupplySection(data, borderColor = 'var(--border)') {
             <div class="section-header">
                 <h2 class="section-title">${createIcon('bar-chart-2', { size: '24', className: 'inline-icon' })} Supply Metrics</h2>
             </div>
+            ${supply.max_supply == null ? `
+            <div class="supply-uncapped-notice" style="margin-bottom: 12px; padding: 8px 12px; border-left: 3px solid ${borderColor}; background: rgba(255,255,255,0.03); font-size: 13px; color: var(--text-secondary);">
+                <strong>&#8734; Uncapped supply</strong> — this chain has no fixed maximum.
+                ${supply.notes ? ` ${supply.notes}` : ' Tail emission continues indefinitely.'}
+            </div>` : ''}
             <div class="data-grid">
                 <div class="data-item">
                     <span class="data-label">Max Supply</span>
-                    <span class="data-value">${formatNumber(supply.max_supply, 0)}</span>
+                    <span class="data-value">${supply.max_supply == null ? '&#8734; Uncapped' : formatNumber(supply.max_supply, 0)}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">Current Supply</span>
-                    <span class="data-value">${formatPercent(currentSupplyPct, 2)}</span>
+                    <span class="data-value">${supply.max_supply == null ? `${formatNumber(supply.current_supply, 0)} ${data.ticker}` : formatPercent(currentSupplyPct, 2)}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">Current Supply Coins</span>
@@ -595,7 +672,7 @@ function renderSupplySection(data, borderColor = 'var(--border)') {
                 </div>
                 <div class="data-item">
                     <span class="data-label">Remaining Emission</span>
-                    <span class="data-value">${formatNumber(supply.emission_remaining, 0)}</span>
+                    <span class="data-value">${supply.max_supply == null ? '&#8734; Uncapped' : formatNumber(supply.emission_remaining, 0)}</span>
                 </div>
             </div>
 
@@ -603,13 +680,21 @@ function renderSupplySection(data, borderColor = 'var(--border)') {
                 <div class="supply-progress-left">
                     <h3 style="margin: 1.5rem 0 1rem 0; color: var(--text);">Supply Progress</h3>
                     <div class="supply-progress-items">
+                        ${supply.max_supply != null ? `
                         <div class="data-item-detailed">
                             <div class="data-item-header">
                                 <span class="data-label">Current Supply %</span>
                                 <span class="data-value">${formatPercent(currentSupplyPct, 2)}</span>
                             </div>
                             <div class="data-description">Total circulating supply as % of max supply</div>
-                        </div>
+                        </div>` : `
+                        <div class="data-item-detailed">
+                            <div class="data-item-header">
+                                <span class="data-label">Current Circulating</span>
+                                <span class="data-value">${formatNumber(supply.current_supply, 0)} ${data.ticker}</span>
+                            </div>
+                            <div class="data-description">Uncapped supply — % of max is undefined</div>
+                        </div>`}
                         <div class="data-item-detailed">
                             <div class="data-item-header">
                                 <span class="data-label">% Mined</span>
@@ -638,8 +723,11 @@ function renderEmissionSection(data, borderColor = 'var(--border)') {
     const hasHalvings = emission.halving_schedule && emission.halving_schedule.length > 0;
 
     // Calculate annual inflation: (Daily Emissions × 365) / Current Supply × 100%
-    const annualEmission = emission.daily_emission * 365;
-    const annualInflationPct = (annualEmission / data.supply.current_supply) * 100;
+    const annualEmission = emission.daily_emission ? emission.daily_emission * 365 : null;
+    const annualInflationPct = emission.annual_inflation_pct
+        ?? (annualEmission && data.supply?.current_supply
+            ? (annualEmission / data.supply.current_supply) * 100
+            : null);
 
     // Split events into traditional halvings and narrative milestones
     let traditionalHalvings = [];
@@ -663,7 +751,7 @@ function renderEmissionSection(data, borderColor = 'var(--border)') {
             <div class="data-grid">
                 <div class="data-item">
                     <span class="data-label">Block Reward</span>
-                    <span class="data-value">${emission.current_block_reward} ${data.ticker}</span>
+                    <span class="data-value">${emission.current_block_reward != null ? `${emission.current_block_reward} ${data.ticker}` : 'N/A'}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">Block Time</span>
@@ -1174,7 +1262,7 @@ function renderGenesisSection(genesis, borderColor = 'var(--border)') {
             ${renderAllocationChart(genesis)}
             ${renderDecentralizationPath(projectData, genesis)}
             ${renderInvestorDetails(genesis)}
-            ${genesis.vesting_waterfall ? renderVestingWaterfall(genesis.vesting_waterfall) : ''}
+            ${Array.isArray(genesis.vesting_waterfall) && genesis.vesting_waterfall.length > 0 ? renderVestingWaterfall(genesis.vesting_waterfall) : ''}
         </div>
     `;
 }
@@ -1310,7 +1398,7 @@ function renderMarketSection(data, borderColor = 'var(--border)') {
                 </div>
                 <div class="data-item">
                     <span class="data-label">FDMC</span>
-                    <span class="data-value">${formatCurrency(market.fdmc)}</span>
+                    <span class="data-value">${data.supply?.max_supply == null ? '&#8734; Uncapped' : formatCurrency(market.fdmc)}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">Circulating MCap</span>
@@ -1581,14 +1669,29 @@ function renderEmissionTimelineChart(data) {
     const labels = [];
     const emissionData = [];
 
-    // Build timeline data
-    let currentReward = data.emission.halving_schedule[0]?.reward_before || data.emission.current_block_reward;
+    // Build timeline data. reward_before / reward_after may be either numeric
+    // (Bitcoin-style discrete halvings) or descriptive strings (PoLW-style
+    // continuous curves with narrative "step" entries). Parse numerically and
+    // fall back to current_block_reward when an entry isn't a usable number,
+    // so chains with descriptive halving entries still get a flat-line chart
+    // at their current emission rate instead of NaN-everything.
+    const toNumber = (v) => {
+        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+        if (typeof v !== 'string') return null;
+        const m = v.trim().match(/^-?\d+(?:\.\d+)?/);
+        if (!m) return null;
+        const n = parseFloat(m[0]);
+        return Number.isFinite(n) ? n : null;
+    };
+
+    const fallbackReward = toNumber(data.emission.current_block_reward);
+    let currentReward = toNumber(data.emission.halving_schedule[0]?.reward_before) ?? fallbackReward;
     const blockTime = data.emission.block_time_seconds;
     const blocksPerYear = (365.25 * 24 * 60 * 60) / blockTime;
 
     const halvings = data.emission.halving_schedule.map(h => ({
         year: (new Date(h.date) - launchDate) / (1000 * 60 * 60 * 24 * 365.25),
-        reward: h.reward_after,
+        reward: toNumber(h.reward_after),
         height: h.height
     }));
 
@@ -1597,13 +1700,16 @@ function renderEmissionTimelineChart(data) {
 
         // Find if there's a halving at this year
         const halving = halvings.find(h => Math.abs(h.year - year) < 0.5);
-        if (halving) {
+        if (halving && halving.reward != null) {
             currentReward = halving.reward;
         }
 
-        const annualEmission = currentReward * blocksPerYear;
+        const annualEmission = currentReward != null ? currentReward * blocksPerYear : null;
         emissionData.push(annualEmission);
     }
+
+    // Skip the chart entirely if we couldn't get a single numeric point.
+    if (emissionData.every(v => v == null)) return '';
 
     // Render chart after DOM is ready
     setTimeout(() => {
@@ -1962,6 +2068,14 @@ function renderDueDiligenceFindings(data, genesis, borderColor = 'var(--border)'
     const warnings = redFlags.warnings || [];
     const suspiciousTimeline = redFlags.suspicious_timeline || suspectedMining.evidence || [];
 
+    // red_flags entries may be either objects ({title, description}) or plain
+    // strings — handle both shapes.
+    const issueText = (entry) => {
+        if (typeof entry === 'string') return entry;
+        if (entry && typeof entry === 'object') return entry.title || entry.description || '';
+        return '';
+    };
+
     // Build issues list
     let issuesHtml = '';
 
@@ -1970,7 +2084,7 @@ function renderDueDiligenceFindings(data, genesis, borderColor = 'var(--border)'
         issuesHtml += `
             <div class="alert-box alert-critical">
                 ${createIcon('alert-octagon', { size: '20', className: 'inline-icon' })}
-                <strong>CRITICAL:</strong> ${issue.title || issue.description}
+                <strong>CRITICAL:</strong> ${issueText(issue)}
             </div>
         `;
     });
@@ -1980,7 +2094,7 @@ function renderDueDiligenceFindings(data, genesis, borderColor = 'var(--border)'
         issuesHtml += `
             <div class="alert-box alert-warning">
                 ${createIcon('alert-triangle', { size: '20', className: 'inline-icon' })}
-                <strong>WARNING:</strong> ${issue.title || issue.description}
+                <strong>WARNING:</strong> ${issueText(issue)}
             </div>
         `;
     });
@@ -1995,21 +2109,41 @@ function renderDueDiligenceFindings(data, genesis, borderColor = 'var(--border)'
         `;
     }
 
-    // Timeline
+    // Timeline. Entries may be either objects ({date, event/description,
+    // evidence}) or strings like "2025-07-15: Danube upgrade activated…".
+    // For strings, peel off a leading YYYY-MM-DD: prefix as the date.
+    const parseTimelineEntry = (entry) => {
+        if (typeof entry === 'string') {
+            const m = entry.match(/^(\d{4}-\d{2}-\d{2})\s*[:\-]\s*(.+)$/);
+            if (m) return { date: m[1], description: m[2], evidence: null };
+            return { date: null, description: entry, evidence: null };
+        }
+        if (entry && typeof entry === 'object') {
+            return {
+                date: entry.date || null,
+                description: entry.event || entry.description || '',
+                evidence: entry.evidence || null
+            };
+        }
+        return { date: null, description: '', evidence: null };
+    };
+
     let timelineHtml = '';
     if (suspiciousTimeline.length > 0) {
         timelineHtml = `
             <h3 style="margin: 2rem 0 1rem 0; color: var(--text);">${createIcon('clock', { size: '20', className: 'inline-icon' })} Timeline of Events</h3>
             <div class="findings-timeline">
-                ${suspiciousTimeline.map(event => `
+                ${suspiciousTimeline.map(entry => {
+                    const e = parseTimelineEntry(entry);
+                    return `
                     <div class="timeline-event-finding">
-                        <div class="timeline-date">${formatDate(event.date)}</div>
+                        <div class="timeline-date">${e.date ? formatDate(e.date) : ''}</div>
                         <div class="timeline-description">
-                            ${event.event || event.description}
-                            ${event.evidence ? `<div style="margin-top: 0.5rem; font-size: 0.85rem; opacity: 0.7;">Evidence: ${event.evidence}</div>` : ''}
+                            ${e.description}
+                            ${e.evidence ? `<div style="margin-top: 0.5rem; font-size: 0.85rem; opacity: 0.7;">Evidence: ${e.evidence}</div>` : ''}
                         </div>
                     </div>
-                `).join('')}
+                `;}).join('')}
             </div>
         `;
     }
