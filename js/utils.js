@@ -322,8 +322,12 @@ async function fetchProjectList() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const files = await response.json();
-        // Filter for JSON files only
-        return files.filter(file => file.name.endsWith('.json')).map(file => file.name.replace('.json', ''));
+        // Project JSONs only — exclude per-project sidecar files like
+        // <name>.sources.json (provenance/source-of-truth), which live in
+        // the same directory but are not renderable projects.
+        return files
+            .filter(file => file.name.endsWith('.json') && !file.name.endsWith('.sources.json'))
+            .map(file => file.name.replace('.json', ''));
     } catch (error) {
         console.error('Error fetching project list:', error);
         return [];
