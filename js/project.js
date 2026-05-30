@@ -1669,14 +1669,29 @@ function renderEmissionTimelineChart(data) {
     const labels = [];
     const emissionData = [];
 
-    // Build timeline data
-    let currentReward = data.emission.halving_schedule[0]?.reward_before || data.emission.current_block_reward;
+    // Build timeline data. reward_before / reward_after may be either numeric
+    // (Bitcoin-style discrete halvings) or descriptive strings (PoLW-style
+    // continuous curves with narrative "step" entries). Parse numerically and
+    // fall back to current_block_reward when an entry isn't a usable number,
+    // so chains with descriptive halving entries still get a flat-line chart
+    // at their current emission rate instead of NaN-everything.
+    const toNumber = (v) => {
+        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+        if (typeof v !== 'string') return null;
+        const m = v.trim().match(/^-?\d+(?:\.\d+)?/);
+        if (!m) return null;
+        const n = parseFloat(m[0]);
+        return Number.isFinite(n) ? n : null;
+    };
+
+    const fallbackReward = toNumber(data.emission.current_block_reward);
+    let currentReward = toNumber(data.emission.halving_schedule[0]?.reward_before) ?? fallbackReward;
     const blockTime = data.emission.block_time_seconds;
     const blocksPerYear = (365.25 * 24 * 60 * 60) / blockTime;
 
     const halvings = data.emission.halving_schedule.map(h => ({
         year: (new Date(h.date) - launchDate) / (1000 * 60 * 60 * 24 * 365.25),
-        reward: h.reward_after,
+        reward: toNumber(h.reward_after),
         height: h.height
     }));
 
@@ -1685,13 +1700,16 @@ function renderEmissionTimelineChart(data) {
 
         // Find if there's a halving at this year
         const halving = halvings.find(h => Math.abs(h.year - year) < 0.5);
-        if (halving) {
+        if (halving && halving.reward != null) {
             currentReward = halving.reward;
         }
 
-        const annualEmission = currentReward * blocksPerYear;
+        const annualEmission = currentReward != null ? currentReward * blocksPerYear : null;
         emissionData.push(annualEmission);
     }
+
+    // Skip the chart entirely if we couldn't get a single numeric point.
+    if (emissionData.every(v => v == null)) return '';
 
     // Render chart after DOM is ready
     setTimeout(() => {
