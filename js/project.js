@@ -438,11 +438,40 @@ function renderKeyMetrics(data, borderColor = 'var(--border)') {
     `;
 }
 
+// "Available for Mining" semantics break for projects where the headline
+// premine consumes the entire protocol cap (e.g. Quai: max_supply 3B,
+// premine 3B → reserved-for-mining = 0). For those, mining still happens —
+// it just produces tokens beyond max_supply. Swap the label and surface the
+// actual mined-to-date instead.
+function getMiningSegment(projectData, genesisData) {
+    const maxSupply = projectData.supply?.max_supply;
+    const premine = projectData.premine?.absolute_tokens || 0;
+    const reservedPct = genesisData?.available_for_mining_genesis_pct ?? 0;
+
+    if (maxSupply && premine >= maxSupply && reservedPct === 0) {
+        const minedTokens = getMinedTokens(projectData, genesisData) ?? 0;
+        return {
+            label: 'Mined Post-Genesis',
+            percent: (minedTokens / maxSupply) * 100,
+            tokens: minedTokens,
+            note: 'Genesis consumed the protocol cap; mining produces tokens beyond max_supply'
+        };
+    }
+
+    return {
+        label: 'Available for Mining',
+        percent: reservedPct,
+        tokens: maxSupply ? (reservedPct / 100) * maxSupply : 0,
+        note: null
+    };
+}
+
 function renderSupplyAllocation(data, genesis) {
     if (!genesis || !genesis.allocation_tiers) return '';
 
     const tiers = genesis.allocation_tiers;
-    const mining = genesis.available_for_mining_genesis_pct;
+    const miningSeg = getMiningSegment(data, genesis);
+    const mining = miningSeg.percent;
 
     const tier1 = tiers.tier_1_profit_seeking?.total_pct || 0;
     const tier2 = tiers.tier_2_entity_controlled?.total_pct || 0;
@@ -455,7 +484,7 @@ function renderSupplyAllocation(data, genesis) {
     const tier2Tokens = (tier2 / 100) * maxSupply;
     const tier3Tokens = (tier3 / 100) * maxSupply;
     const tier4Tokens = (tier4 / 100) * maxSupply;
-    const miningTokens = (mining / 100) * maxSupply;
+    const miningTokens = miningSeg.tokens;
 
     return `
         <div style="margin-top: 2rem;">
@@ -496,10 +525,11 @@ function renderSupplyAllocation(data, genesis) {
                     </div>` : ''}
                     <div class="legend-item">
                         <div class="legend-color mining"></div>
-                        <span class="legend-text">Available for Mining</span>
+                        <span class="legend-text">${miningSeg.label}</span>
                         <span class="legend-percent">${formatPercent(mining, 1)} (${formatNumber(miningTokens, 0)})</span>
                     </div>
                 </div>
+                ${miningSeg.note ? `<p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; font-style: italic;">${miningSeg.note}.</p>` : ''}
             </div>
         </div>
     `;
@@ -1295,7 +1325,7 @@ function renderGenesisSection(genesis, borderColor = 'var(--border)') {
                 <span class="section-subtitle">${formatPercent(genesis.total_genesis_allocation_pct, 1)} premined</span>
             </div>
 
-            ${renderAllocationChart(genesis)}
+            ${renderAllocationChart(genesis, projectData)}
             ${renderDecentralizationPath(projectData, genesis)}
             ${renderInvestorDetails(genesis)}
             ${Array.isArray(genesis.vesting_waterfall) && genesis.vesting_waterfall.length > 0 ? renderVestingWaterfall(genesis.vesting_waterfall) : ''}
@@ -1315,9 +1345,11 @@ function renderTierRow(label, percent, className) {
     `;
 }
 
-function renderAllocationChart(genesis) {
+function renderAllocationChart(genesis, projectData) {
     const tiers = genesis.allocation_tiers;
-    const mining = genesis.available_for_mining_genesis_pct;
+    const miningSeg = projectData
+        ? getMiningSegment(projectData, genesis)
+        : { label: 'Available for Mining', percent: genesis.available_for_mining_genesis_pct };
 
     const tier1 = tiers.tier_1_profit_seeking?.total_pct || 0;
     const tier2 = tiers.tier_2_entity_controlled?.total_pct || 0;
@@ -1330,7 +1362,7 @@ function renderAllocationChart(genesis) {
             ${tier2 > 0 ? renderTierRow('Tier 2: Entity Controlled (Foundation)', tier2, 'tier-2') : ''}
             ${tier3 > 0 ? renderTierRow('Tier 3: Community', tier3, 'tier-3') : ''}
             ${tier4 > 0 ? renderTierRow('Tier 4: Liquidity', tier4, 'tier-4') : ''}
-            ${renderTierRow('Available for Mining', mining, 'mining')}
+            ${renderTierRow(miningSeg.label, miningSeg.percent, 'mining')}
         </div>
     `;
 }
