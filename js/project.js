@@ -305,9 +305,7 @@ function calculateParityWarning(data, genesis, hasEmission = false) {
         return '';  // Parity is undefined without an emission rate and a fixed allocation
     }
 
-    const daysToDate = daysSinceLaunch(data.launch_date);
-    const premineMinedToDate = (data.supply?.current_supply ?? 0) - allocatedTokens;
-    const minedToDate = premineMinedToDate > 0 ? premineMinedToDate : dailyEmission * daysToDate;
+    const minedToDate = getMinedTokens(data, genesis) ?? 0;
 
     if (minedToDate >= allocatedTokens) {
         return ` | ${createIcon('check-circle', { size: '16', className: 'inline-icon' })} Miners achieved parity`;
@@ -317,6 +315,42 @@ function calculateParityWarning(data, genesis, hasEmission = false) {
     const yearsRemaining = (daysRemaining / 365).toFixed(1);
 
     return ` | Miner parity in ${yearsRemaining} years`;
+}
+
+// Best estimate of how many tokens miners have emitted since launch.
+// Resolution order:
+//   1. genesis.miner_parity_analysis.cumulative_mined_to_date (authoritative sidecar)
+//   2. current_supply − premine_total, if non-negative (premine fully vested case)
+//   3. daily_emission × days_since_launch (constant-emission fallback)
+//   4. null when nothing is computable
+//
+// The subtraction (#2) is the historical default and matches existing behavior
+// for every project where current_supply >= genesis_allocation. For
+// actively-vesting premines where the headline genesis exceeds what has
+// actually been issued (e.g. Quai: 996M circulating < 3B genesis), the
+// subtraction returns negative; we fall through to the sidecar/time-based
+// path instead of clamping to 0 and showing "0% mined".
+function getMinedTokens(projectData, genesisData) {
+    const sidecar = genesisData?.miner_parity_analysis?.cumulative_mined_to_date;
+    if (sidecar != null) return sidecar;
+
+    const currentSupply = projectData.supply?.current_supply;
+    const premineTokens = projectData.premine?.absolute_tokens
+        ?? (genesisData?.total_genesis_allocation_pct != null && projectData.supply?.max_supply
+            ? (genesisData.total_genesis_allocation_pct / 100) * projectData.supply.max_supply
+            : 0);
+
+    if (currentSupply != null && currentSupply >= premineTokens) {
+        return currentSupply - premineTokens;
+    }
+
+    const daily = projectData.emission?.daily_emission;
+    const launch = projectData.launch_date;
+    if (daily && launch) {
+        const days = Math.max(0, (Date.now() - new Date(launch).getTime()) / 86400000);
+        return daily * days;
+    }
+    return null;
 }
 
 function calculateMinedPercent(projectData, genesisData) {
@@ -329,28 +363,22 @@ function calculateMinedPercent(projectData, genesisData) {
     const hasAllocation = projectData.has_premine || (genesisData && (genesisData.has_premine || genesisData.has_emission_allocation));
 
     // Uncapped supply (e.g. tail emission): compute "% mined" relative to current
-    // circulating instead of max supply, using premine.absolute_tokens.
+    // circulating instead of max supply.
     if (maxSupply == null) {
         if (!hasAllocation) return 100;
-        const premineTokens = projectData.premine?.absolute_tokens;
-        if (!premineTokens) return null;
-        const minedTokens = Math.max(0, currentSupply - premineTokens);
+        const minedTokens = getMinedTokens(projectData, genesisData);
+        if (minedTokens == null) return null;
         return (minedTokens / currentSupply) * 100;
     }
 
-    const currentSupplyPct = (currentSupply / maxSupply) * 100;
-
-    // For fair launches, % mined equals current supply %
+    // For fair launches, % mined equals current supply % of max
     if (!hasAllocation || !genesisData) {
-        return currentSupplyPct;
+        return (currentSupply / maxSupply) * 100;
     }
 
-    // Calculate % mined excluding premine/emission allocation
-    const allocationPct = genesisData.total_genesis_allocation_pct || 0;
-    const minedPct = currentSupplyPct - allocationPct;
-
-    // Cap at 0% if allocation exceeds current supply (early stage projects)
-    return Math.max(0, minedPct);
+    const minedTokens = getMinedTokens(projectData, genesisData);
+    if (minedTokens == null) return 0;
+    return Math.min(100, (minedTokens / maxSupply) * 100);
 }
 
 function renderKeyMetrics(data, borderColor = 'var(--border)') {
@@ -494,7 +522,7 @@ function renderDecentralizationPath(data, genesis) {
     if (!genesisTotal) return '';
 
     const minedToDate = parity.cumulative_mined_to_date
-        ?? (data.supply?.current_supply != null ? data.supply.current_supply - genesisTotal : null);
+        ?? getMinedTokens(data, genesis);
 
     if (minedToDate == null) return '';
 
@@ -573,7 +601,7 @@ function renderCurrentSupplyPieChart(projectData, genesisData) {
             const tier2Tokens = (tier2Pct / totalGenesisPct) * premineTokens;
             const tier3Tokens = (tier3Pct / totalGenesisPct) * premineTokens;
             const tier4Tokens = (tier4Pct / totalGenesisPct) * premineTokens;
-            const minedTokens = Math.max(0, currentSupply - premineTokens);
+            const minedTokens = getMinedTokens(projectData, genesisData) ?? 0;
             const pct = (n) => (n / currentSupply) * 100;
             slices = [
                 { label: 'Mined (Block Rewards)', percent: pct(minedTokens), class: 'mining', tokens: minedTokens },
@@ -595,8 +623,8 @@ function renderCurrentSupplyPieChart(projectData, genesisData) {
             const tier3Pct = tiers.tier_3_community?.total_pct || 0;
             const tier4Pct = tiers.tier_4_liquidity?.total_pct || 0;
             const premineTotalPct = genesisData.total_genesis_allocation_pct || 0;
-            const minedPct = Math.max(0, currentSupplyPct - premineTotalPct);
-            const minedTokens = (minedPct / 100) * maxSupply;
+            const minedTokens = getMinedTokens(projectData, genesisData) ?? 0;
+            const minedPct = (minedTokens / maxSupply) * 100;
             const tier1Tokens = (tier1Pct / 100) * maxSupply;
             const tier2Tokens = (tier2Pct / 100) * maxSupply;
             const tier3Tokens = (tier3Pct / 100) * maxSupply;
